@@ -21,42 +21,75 @@ def root():
 @app.route("/kv-store/<keyName>", methods=["GET", "PUT", "DELETE"])
 def kvstore(keyName):
 
-	# determine node type
+	# determine node type, either main-instance or follower-instance
+	STATE = ""
+
 	if "FORWARDING_ADDRESS" in (os.environ):
 		# I am a follower process, route requests to main
-		pass
+		STATE = "follower" 
 	else:
 		# I am the main process, respond to client to route to follower
-		pass
+		STATE = "main"
 
 	data = request.get_json()
 
 	if (request.method == "PUT"):
-
 		# put request, ensure theres a value for the key
 		if len(data) == 0:
 			return jsonify({"error":"Value is missing","message":"Error in PUT"}), 400
 
-		try:
-			if keyName in keyStore:
+		if STATE == "main":
+			# put value in local keyStore
+			try:
+				if keyName in keyStore:
+					keyStore[keyName] = data["value"]
+					return jsonify({"message":"Updated successfully","replaced":"true"}), 201
 				keyStore[keyName] = data["value"]
-				return jsonify({"message":"Updated successfully","replaced":"true"}), 201
-			keyStore[keyName] = data["value"]
-			return jsonify({"message":"Added successfully","replaced":"false"}), 201
-		except:
-			return jsonify({"message":"Added successfully","replaced":"false"}), 201
+				return jsonify({"message":"Added successfully","replaced":"false"}), 201
+			except:
+				return jsonify({"message":"Added successfully","replaced":"false"}), 201
+
+		else:
+			# put method in keyStore of main instance/send to main
+			pass
 
 	elif (request.method == "GET"):
-		try:
-			return jsonify({"message":"Added successfully","replaced":"false"}), 201
-		except:
-			return jsonify({"message":"Added successfully","replaced":"false"}), 201
-	return 
 
+		if STATE == "main":
+			# get value from local keyStore
+
+			try:
+				return jsonify({"message":"Added successfully","replaced":"false"}), 201
+			except:
+				return jsonify({"message":"Added successfully","replaced":"false"}), 201
+
+		else:
+			# get value from main instance keyStore/send to main
+			pass
+	
+	elif (request.method == "DELETE"):
+
+		if STATE == "main":
+			# delete value from local
+			pass
+
+		else:
+			# delete from main
+			pass
 
 
 # run the server
 if __name__ == "__main__":
 	# run it on our localhost with a port of 8081 with debugging enabled so we can auto restart when changes are made
 	app.run(host='0.0.0.0', port=13800, debug=True)
+
+
+
+
+
+
+
+
+
+	
 
