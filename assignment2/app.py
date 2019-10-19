@@ -39,9 +39,11 @@ def kvstore(keyName):
 	data = request.get_json()
 
 	if (request.method == "PUT"):
-		# put request, ensure theres a value for the key
+		# put request, ensure theres a value for the key and less than 50 characters
 		if len(data) == 0:
 			return jsonify({"error":"Value is missing","message":"Error in PUT"}), 400
+        if len(data) > 50:
+            return jsonify({"error":"Key is too long","message":"Error in PUT"}), 400
 
 		if len(data) > 50:
             return jsonify({"error":"Key is too long","message":"Error in PUT"}), 400
