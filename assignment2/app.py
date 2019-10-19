@@ -45,9 +45,6 @@ def kvstore(keyName):
         if len(data) > 50:
             return jsonify({"error":"Key is too long","message":"Error in PUT"}), 400
 
-		if len(data) > 50:
-            return jsonify({"error":"Key is too long","message":"Error in PUT"}), 400
-
 		if STATE == "main":
 			# put value in local keyStore
 			if keyName in keyStore:
