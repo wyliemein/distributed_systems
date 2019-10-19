@@ -17,12 +17,7 @@ app = Flask(__name__)
 # respond to calls to the root of our app
 @app.route("/")
 def root():
-	return "CS 138: Assignment 2"
-
-# endpoint that recieves internal messages between main and follower
-@app.route("/kv-store/route/<message>", methods=["GET", "PUT", "DELETE"])
-def recieve(message):
-	return "internal message recieved"
+	return "Home: CS 138: Assignment 2"
 
 # client side enpoint
 @app.route("/kv-store/<keyName>", methods=["GET", "PUT", "DELETE"])
@@ -48,6 +43,9 @@ def kvstore(keyName):
 		if len(data) == 0:
 			return jsonify({"error":"Value is missing","message":"Error in PUT"}), 400
 
+		if len(data) > 50:
+            return jsonify({"error":"Key is too long","message":"Error in PUT"}), 400
+
 		if STATE == "main":
 			# put value in local keyStore
 			if keyName in keyStore:
@@ -60,14 +58,12 @@ def kvstore(keyName):
 		else:
 			# put keyName:data in keyStore of main
 			# request endpoint of main
-			#print("FORWARDING_ADDRESS:", ip_port[0], " -- ", ip_port[1])
 			endpoint = 'http://' + ip_port[0] + ":" + ip_port[1] + '/kv-store/' + keyName
 			headers = {'content-type': 'application/json', 'Accept-Charset': 'UTF-8'}
-			payload = data['value']
-			r = requests.post(endpoint, data=payload, headers=headers)
+			payload = json.dumps(data)
 			
-			return r, 201
-			#return jsonify({"FORWARDING_ADDRESS":ip_port[0],"port":ip_port[1], "url":endpoint}), 201
+			r = requests.put(endpoint, data=payload, headers=headers)
+			return make_response(r.content, r.status_code)
 
 
 	elif (request.method == "GET"):
