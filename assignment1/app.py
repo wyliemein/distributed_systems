@@ -1,8 +1,6 @@
 # Robert Crosby
-# rncrosby@ucsc.edu
-# 1529995
-# Assignment 1
-# Tuesday, October 8 @ 12:11 PM
+# Cody Hartsook
+# Gardner Mein
 
 from flask import Flask, request, jsonify
 import json
