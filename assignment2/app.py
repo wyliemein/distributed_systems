@@ -37,32 +37,19 @@ def kvstore(keyName):
 	if (request.method == "PUT"):
 		data = request.get_json()
 		keyValue = data.get("value")
-		return main_storeValue(keyName, keyValue)
-		# if (len(data) == 0):
-		# 	return 
 
-		# if (len(data) > 50):
-		# 	return jsonify({"error":"Key is too long","message":"Error in PUT"}), 400
+		if STATE == "main":
+			return main_storeValue(keyName, keyValue)
 
-		# if STATE == "main":
-		# 	# put value in local keyStore
-		# 	if keyName in keyStore:
-		# 		keyStore[keyName] = data["value"]
-		# 		return jsonify({"message":"Updated successfully","replaced":"true"}), 201
-
-		# 	keyStore[keyName] = data["value"]
-		# 	return jsonify({"message":"Added successfully","replaced":"false"}), 201
-
-		# else:
-		# 	# put keyName:data in keyStore of main
-		# 	# request endpoint of main
-		# 	endpoint = 'http://' + ip_port[0] + ":" + ip_port[1] + '/kv-store/' + keyName
-		# 	headers = {'content-type': 'application/json', 'Accept-Charset': 'UTF-8'}
-		# 	payload = json.dumps(data)
+		else:
+			# get value from main instance keyStore/send to main
+			endpoint = 'http://' + ip_port[0] + ":" + ip_port[1] + '/kv-store/' + keyName
+		 	headers = {'content-type': 'application/json', 'Accept-Charset': 'UTF-8'}
+		 	payload = json.dumps(data)
 			
-		# 	r = requests.put(endpoint, data=payload, headers=headers)
-		# 	return make_response(r.content, r.status_code)
-
+		 	# make recursive type call but to different ip
+		 	r = requests.put(endpoint, data=payload, headers=headers)
+		 	return make_response(r.content, r.status_code)
 
 	elif (request.method == "GET"):
 
@@ -71,7 +58,13 @@ def kvstore(keyName):
 			return main_retrieveValue(keyName)
 		else:
 			# get value from main instance keyStore/send to main
-			pass
+			endpoint = 'http://' + ip_port[0] + ":" + ip_port[1] + '/kv-store/' + keyName
+		 	headers = {'content-type': 'application/json', 'Accept-Charset': 'UTF-8'}
+		 	payload = keyName
+			
+		 	# make recursive type call but to different ip
+		 	r = requests.put(endpoint, data=payload, headers=headers)
+		 	return make_response(r.content, r.status_code)
 	
 	elif (request.method == "DELETE"):
 
@@ -79,8 +72,13 @@ def kvstore(keyName):
 			return main_deleteKey(keyName)
 		else:
 			# delete from main
-			pass
-
+			endpoint = 'http://' + ip_port[0] + ":" + ip_port[1] + '/kv-store/' + keyName
+		 	headers = {'content-type': 'application/json', 'Accept-Charset': 'UTF-8'}
+		 	payload = keyName
+			
+		 	# make recursive type call but to different ip
+		 	r = requests.put(endpoint, data=payload, headers=headers)
+		 	return make_response(r.content, r.status_code)
 	
 def main_storeValue(key,value):
 	if (len(value) > 50):
