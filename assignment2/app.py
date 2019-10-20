@@ -36,10 +36,9 @@ def kvstore(keyName):
 	# recieve request from client
 	if (request.method == "PUT"):
 		data = request.get_json()
-		keyValue = data.get("value")
 
 		if STATE == "main":
-			return main_storeValue(keyName, keyValue)
+			return main_storeValue(keyName, data)
 
 		else:
 			# get value from main instance keyStore/send to main
@@ -63,7 +62,7 @@ def kvstore(keyName):
 			payload = keyName
 			
 		 	# make recursive type call but to different ip
-			r = requests.put(endpoint, data=payload, headers=headers)
+			r = requests.get(endpoint, data=payload, headers=headers)
 			return make_response(r.content, r.status_code)
 	
 	elif (request.method == "DELETE"):
@@ -77,10 +76,18 @@ def kvstore(keyName):
 			payload = keyName
 			
 		 	# make recursive type call but to different ip
-			r = requests.put(endpoint, data=payload, headers=headers)
+			r = requests.delete(endpoint, data=payload, headers=headers)
 			return make_response(r.content, r.status_code)
 	
-def main_storeValue(key,value):
+def main_storeValue(key, data):
+	if len(data) < 1:
+		return jsonify({
+			"error"     : "Value is missing",
+			"message"   : "Error in PUT"
+		}), 400
+
+	value = data.get("value")
+
 	if (len(value) > 50):
 		# too long
 		return jsonify({
