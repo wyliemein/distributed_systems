@@ -1,14 +1,7 @@
-<<<<<<< HEAD
 # Robert Crosby
 # Cody Hartsook
 # Gardner Mein
-=======
 # Contributors: Robert Crosby, Cody Hartsook, Wylie
-# rncrosby@ucsc.edu
-# 1529995
-# Assignment 2
-# Tuesday, October 8 @ 12:11 PM
->>>>>>> c2f8af065110fa4255c547f7efd6a2c71bf50ec0
 
 from flask import Flask, request, jsonify, make_response
 import json
@@ -28,7 +21,6 @@ def root():
 # client side enpoint
 @app.route("/kv-store/<keyName>", methods=["GET", "PUT", "DELETE"])
 def kvstore(keyName):
-
 	# determine node type, either main-instance or follower-instance
 	STATE = ""
 
@@ -42,45 +34,41 @@ def kvstore(keyName):
 		STATE = "main"
 
 	# recieve request from client
-	data = request.get_json()
-
 	if (request.method == "PUT"):
-		# put request, ensure theres a value for the key and less than 50 characters
-		if len(data) == 0:
-			return jsonify({"error":"Value is missing","message":"Error in PUT"}), 400
-        if len(data) > 50:
-            return jsonify({"error":"Key is too long","message":"Error in PUT"}), 400
+		data = request.get_json()
+		keyValue = data.get("value")
+		return main_storeValue(keyName, keyValue)
+		# if (len(data) == 0):
+		# 	return 
 
-		if STATE == "main":
-			# put value in local keyStore
-			if keyName in keyStore:
-				keyStore[keyName] = data["value"]
-				return jsonify({"message":"Updated successfully","replaced":"true"}), 201
+		# if (len(data) > 50):
+		# 	return jsonify({"error":"Key is too long","message":"Error in PUT"}), 400
 
-			keyStore[keyName] = data["value"]
-			return jsonify({"message":"Added successfully","replaced":"false"}), 201
+		# if STATE == "main":
+		# 	# put value in local keyStore
+		# 	if keyName in keyStore:
+		# 		keyStore[keyName] = data["value"]
+		# 		return jsonify({"message":"Updated successfully","replaced":"true"}), 201
 
-		else:
-			# put keyName:data in keyStore of main
-			# request endpoint of main
-			endpoint = 'http://' + ip_port[0] + ":" + ip_port[1] + '/kv-store/' + keyName
-			headers = {'content-type': 'application/json', 'Accept-Charset': 'UTF-8'}
-			payload = json.dumps(data)
+		# 	keyStore[keyName] = data["value"]
+		# 	return jsonify({"message":"Added successfully","replaced":"false"}), 201
+
+		# else:
+		# 	# put keyName:data in keyStore of main
+		# 	# request endpoint of main
+		# 	endpoint = 'http://' + ip_port[0] + ":" + ip_port[1] + '/kv-store/' + keyName
+		# 	headers = {'content-type': 'application/json', 'Accept-Charset': 'UTF-8'}
+		# 	payload = json.dumps(data)
 			
-			r = requests.put(endpoint, data=payload, headers=headers)
-			return make_response(r.content, r.status_code)
+		# 	r = requests.put(endpoint, data=payload, headers=headers)
+		# 	return make_response(r.content, r.status_code)
 
 
 	elif (request.method == "GET"):
 
 		if STATE == "main":
 			# get value from local keyStore
-
-			try:
-				return jsonify({"message":"Added successfully","replaced":"false"}), 201
-			except:
-				return jsonify({"message":"Added successfully","replaced":"false"}), 201
-
+			return main_retrieveValue(keyName)
 		else:
 			# get value from main instance keyStore/send to main
 			pass
@@ -88,12 +76,61 @@ def kvstore(keyName):
 	elif (request.method == "DELETE"):
 
 		if STATE == "main":
-			# delete value from local
-			pass
-
+			return main_deleteKey(keyName)
 		else:
 			# delete from main
 			pass
+
+	
+def main_storeValue(key,value):
+	if (len(value) > 50):
+		# too long
+		return jsonify({
+			"error"		: "Key is too long",
+			"message"	: "Error in PUT"
+		}), 400
+	elif key in keyStore:
+		# updated
+		keyStore[key] = value
+		return jsonify({
+			"message"	: "Updated successfully",
+			"replaced"	: True
+		}), 200
+	else:
+		keyStore[key] = value
+		return jsonify({
+			"message"	: "Added successfully",
+			"replaced"	: False
+		}), 200
+
+def main_retrieveValue(key):
+	if (key in keyStore):
+		return jsonify({
+			"doesExist"	: True,
+			"message"	: "Retrieved successfully",
+			"value"		: keyStore[key]
+		}), 200
+	else:
+		return jsonify({
+			"doesExist"	: False,
+			"error"		: "Key does not exist",
+			"message"	: "Error in GET"
+		}), 404
+
+def main_deleteKey(key):
+	if (key in keyStore):
+		del keyStore[key]
+		return jsonify({
+			"doesExist"	: True,
+			"message"	: "Deleted successfully",
+		}), 200
+	else:
+		return jsonify({
+			"doesExist"	: False,
+			"error"		: "Key does not exist",
+			"message"	: "Error in DELETE"
+		}), 404
+	
 
 
 # run the server
