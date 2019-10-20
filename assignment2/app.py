@@ -1,10 +1,19 @@
+<<<<<<< HEAD
 # Robert Crosby
 # Cody Hartsook
 # Gardner Mein
+=======
+# Contributors: Robert Crosby, Cody Hartsook, Wylie
+# rncrosby@ucsc.edu
+# 1529995
+# Assignment 2
+# Tuesday, October 8 @ 12:11 PM
+>>>>>>> c2f8af065110fa4255c547f7efd6a2c71bf50ec0
 
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, make_response
 import json
 import os
+import requests
 
 keyStore = {}
 
@@ -14,8 +23,9 @@ app = Flask(__name__)
 # respond to calls to the root of our app
 @app.route("/")
 def root():
-	return "CS 138: Assignment 2"
+	return "Home: CS 138: Assignment 2"
 
+# client side enpoint
 @app.route("/kv-store/<keyName>", methods=["GET", "PUT", "DELETE"])
 def kvstore(keyName):
 
@@ -25,31 +35,41 @@ def kvstore(keyName):
 	if "FORWARDING_ADDRESS" in (os.environ):
 		# I am a follower process, route requests to main
 		STATE = "follower" 
+		ip_port = str(os.environ["FORWARDING_ADDRESS"]).split(":")
+
 	else:
-		# I am the main process, respond to client to route to follower
+		# I am the main process, respond to client
 		STATE = "main"
 
+	# recieve request from client
 	data = request.get_json()
 
 	if (request.method == "PUT"):
-		# put request, ensure theres a value for the key
+		# put request, ensure theres a value for the key and less than 50 characters
 		if len(data) == 0:
 			return jsonify({"error":"Value is missing","message":"Error in PUT"}), 400
+        if len(data) > 50:
+            return jsonify({"error":"Key is too long","message":"Error in PUT"}), 400
 
 		if STATE == "main":
 			# put value in local keyStore
-			try:
-				if keyName in keyStore:
-					keyStore[keyName] = data["value"]
-					return jsonify({"message":"Updated successfully","replaced":"true"}), 201
+			if keyName in keyStore:
 				keyStore[keyName] = data["value"]
-				return jsonify({"message":"Added successfully","replaced":"false"}), 201
-			except:
-				return jsonify({"message":"Added successfully","replaced":"false"}), 201
+				return jsonify({"message":"Updated successfully","replaced":"true"}), 201
+
+			keyStore[keyName] = data["value"]
+			return jsonify({"message":"Added successfully","replaced":"false"}), 201
 
 		else:
-			# put method in keyStore of main instance/send to main
-			pass
+			# put keyName:data in keyStore of main
+			# request endpoint of main
+			endpoint = 'http://' + ip_port[0] + ":" + ip_port[1] + '/kv-store/' + keyName
+			headers = {'content-type': 'application/json', 'Accept-Charset': 'UTF-8'}
+			payload = json.dumps(data)
+			
+			r = requests.put(endpoint, data=payload, headers=headers)
+			return make_response(r.content, r.status_code)
+
 
 	elif (request.method == "GET"):
 
@@ -89,5 +109,4 @@ if __name__ == "__main__":
 
 
 
-	
 
