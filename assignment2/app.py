@@ -44,12 +44,12 @@ def kvstore(keyName):
 		else:
 			# get value from main instance keyStore/send to main
 			endpoint = 'http://' + ip_port[0] + ":" + ip_port[1] + '/kv-store/' + keyName
-		 	headers = {'content-type': 'application/json', 'Accept-Charset': 'UTF-8'}
-		 	payload = json.dumps(data)
+			headers = {'content-type': 'application/json', 'Accept-Charset': 'UTF-8'}
+			payload = json.dumps(data)
 			
-		 	# make recursive type call but to different ip
-		 	r = requests.put(endpoint, data=payload, headers=headers)
-		 	return make_response(r.content, r.status_code)
+			# make recursive type call but to different ip
+			r = requests.put(endpoint, data=payload, headers=headers)
+			return make_response(r.content, r.status_code)
 
 	elif (request.method == "GET"):
 
@@ -59,12 +59,12 @@ def kvstore(keyName):
 		else:
 			# get value from main instance keyStore/send to main
 			endpoint = 'http://' + ip_port[0] + ":" + ip_port[1] + '/kv-store/' + keyName
-		 	headers = {'content-type': 'application/json', 'Accept-Charset': 'UTF-8'}
-		 	payload = keyName
+			headers = {'content-type': 'application/json', 'Accept-Charset': 'UTF-8'}
+			payload = keyName
 			
 		 	# make recursive type call but to different ip
-		 	r = requests.put(endpoint, data=payload, headers=headers)
-		 	return make_response(r.content, r.status_code)
+			r = requests.put(endpoint, data=payload, headers=headers)
+			return make_response(r.content, r.status_code)
 	
 	elif (request.method == "DELETE"):
 
@@ -73,12 +73,12 @@ def kvstore(keyName):
 		else:
 			# delete from main
 			endpoint = 'http://' + ip_port[0] + ":" + ip_port[1] + '/kv-store/' + keyName
-		 	headers = {'content-type': 'application/json', 'Accept-Charset': 'UTF-8'}
-		 	payload = keyName
+			headers = {'content-type': 'application/json', 'Accept-Charset': 'UTF-8'}
+			payload = keyName
 			
 		 	# make recursive type call but to different ip
-		 	r = requests.put(endpoint, data=payload, headers=headers)
-		 	return make_response(r.content, r.status_code)
+			r = requests.put(endpoint, data=payload, headers=headers)
+			return make_response(r.content, r.status_code)
 	
 def main_storeValue(key,value):
 	if (len(value) > 50):
@@ -99,7 +99,7 @@ def main_storeValue(key,value):
 		return jsonify({
 			"message"	: "Added successfully",
 			"replaced"	: False
-		}), 200
+		}), 201
 
 def main_retrieveValue(key):
 	if (key in keyStore):
