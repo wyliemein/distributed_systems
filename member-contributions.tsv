@@ -1,3 +1,3 @@
-gmein	"Functions of the PUT key/value store to properly handle all the error cases (length and empty), helped with testing"
+gmein	    "Functions of the PUT key/value store to properly handle all the error cases (length and empty), helped with testing"
 rncrosby	"Implemented GET and DELETE, helped with error checking"
-chartsoo "Implemented communication forwarding between different instances and the client"
+chartsoo  "Implemented communication forwarding between different instances and the client"
