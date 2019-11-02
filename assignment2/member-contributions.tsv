@@ -1,1 +1,3 @@
-Rob and Wylie: We built the functions of the PUT key/value store to properly handle all the error cases (length and empty), and implemented GET and DELETE
+gmein	    "Functions of the PUT key/value store to properly handle all the error cases (length and empty), helped with testing"
+rncrosby	"Implemented GET and DELETE, helped with error checking"
+chartsoo  "Implemented communication forwarding between different instances and the client"
