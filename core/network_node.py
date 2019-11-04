@@ -3,7 +3,6 @@
 
 from flask import Flask, request, jsonify, make_response
 import json
-from Database import Database
 import os
 import requests
 

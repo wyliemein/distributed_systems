@@ -17,7 +17,7 @@ from database import Database # want to be able to use Database methods
 class Partition(Database):
 	"""docstring for consistent_hash class"""
 	def __init__(self):
-		super.__init__(self)
+		Database.__init__(self)
 		self.peers = []
 		self.IP = None
 		self.view = None
