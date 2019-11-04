@@ -8,15 +8,16 @@ import os
 import requests
 
 # import shard class
-from shard import consistent_hash
-shard = consistent_hash()
+from shard import Partition
 
+shard = Partition()
 node = Flask(__name__)
 
 @node.route("/")
 def root():
 	return "Home: CS 138: Assignment 3"
 
+# get/put/delete key for shard
 @node.route("/kv-store/keys/<keyName>", methods=["GET", "PUT", "DELETE"])
 def kvstore(keyName):
 	'''
@@ -36,6 +37,16 @@ def kvstore(keyName):
 		return jsonify({
 			"error"		: "somethings not right"
 		}), 400
+
+# get number of keys in system
+@node.route("/kv-store/key-count", methods=["GET"])
+def get_key_count():
+	pass
+
+# change our current view
+@node.route("/kv-store/view-change", methods=["PUT"])
+def new_view():
+	pass
 
 
 # run the servers

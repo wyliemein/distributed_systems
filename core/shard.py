@@ -11,10 +11,10 @@
 #	the data between two nodes on the circle
 
 import xxhash
-from Database import Database # want to be able to use Database methods
+from database import Database # want to be able to use Database methods
 
 # create a shard given database class
-class consistent_hash(Database):
+class Partition(Database):
 	"""docstring for consistent_hash class"""
 	def __init__(self):
 		super.__init__(self)
@@ -25,15 +25,15 @@ class consistent_hash(Database):
 	# hash server to ring
 	# use concept of virtual node, each node is mapped to multiple places in the ring
 	# this produces further even distribution
-	def map_server():
+	def map_server(self):
 		pass
 
 	# hash data to ring
-	def map_data():
+	def map_data(self):
 		pass
 
 	# respond to view change request, perform a reshard
-	def view_change():
+	def view_change(self):
 		pass
 
 
