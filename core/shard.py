@@ -16,11 +16,11 @@ from database import Database # want to be able to use Database methods
 # create a shard given database class
 class Partition(Database):
 	"""docstring for consistent_hash class"""
-	def __init__(self):
+	def __init__(self, IP, view):
 		Database.__init__(self)
 		self.peers = []
-		self.IP = None
-		self.view = None
+		self.IP = IP
+		self.view = view
 
 	# hash server to ring
 	# use concept of virtual node, each node is mapped to multiple places in the ring
@@ -35,6 +35,7 @@ class Partition(Database):
 	# respond to view change request, perform a reshard
 	def view_change(self):
 		pass
+
 
 
 
