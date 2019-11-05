@@ -11,15 +11,11 @@ addr3="10.10.0.4:13800"
 initial_full_view="${addr1},${addr2}"
 full_view=${initial_full_view},${addr3}
 
-docker run --name="node1"        --net=kv_subnet     \
-           --ip=10.10.0.2        -p 13802:13800      \
-           -e ADDRESS="${addr1}"                     \
-           -e VIEW=${initial_full_view}              \
-           kv-store:3.0
-
-docker run --name="node2"        --net=kv_subnet     \
-           --ip=10.10.0.3        -p 13803:13800      \
-           -e ADDRESS="${addr2}"                     \
-           -e VIEW=${initial_full_view}              \
-           kv-store:3.0
+ docker run -p 13800:13800 \
+		--net=kv_subnet \
+		--ip=10.10.0.3 \
+		--name="node1" \
+		-e ADDRESS="${addr1}" \
+		-e VIEW=${initial_full_view} \
+		kv-store:3.0
 
