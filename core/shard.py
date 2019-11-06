@@ -10,7 +10,7 @@
 #	the predecessor on the circle
 #	the data between two nodes on the circle
 
-import xxhash
+import xxhash as hasher
 import random, string
 from bisect import bisect_left
 from database import Database # want to be able to use Database methods
@@ -21,7 +21,6 @@ class Partition(Database):
 	def __init__(self, IP, view):
 		Database.__init__(self)
 		self.virtual_range = 10
-		self.hasher = xxhash.xxh32()
 		self.IP = IP
 		self.Physical_Nodes = view
 		self.VIEW = []
@@ -32,14 +31,14 @@ class Partition(Database):
 	# use concept of virtual nodes
 	def initial_view(self, view):
 
-		unsorted_list = {}
+		unsorted_list = []
 
 		# insert ip addresses into dict
 		for ip_port in view:
 			for v_num in range(self.virtual_range):
 
 				virtural_node = ip_port + str(v_num)
-				ring_num = self.hasher.digest(virtural_node) # unique value on "ring"
+				ring_num = hasher.xxh32(virtural_node).digest() # unique value on "ring"
 
 				unsorted_list.append(ring_num)
 				self.LABELS[ring_num] = ip_port
@@ -50,7 +49,7 @@ class Partition(Database):
 	# perform a key operation, ie find the correct node given key
 	def key_op(self, key):
 		
-		ring_val = self.hasher.digest(key)
+		ring_val = hasher.xxh32(key).digest()
 
 		node_ring_val = self.find_node(ring_val) 
 		ip_port = self.LABELS[node_ring_val]
