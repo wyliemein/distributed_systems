@@ -23,6 +23,7 @@ class Partition(Database):
 		self.virtual_range = 10
 		self.hasher = xxhash.xxh32()
 		self.IP = IP
+		self.Physical_Nodes = view
 		self.VIEW = []
 		self.LABELS = {}
 		self.initial_view(view)
@@ -58,14 +59,22 @@ class Partition(Database):
 
 	# return list of nodes to query which can be done in app
 	def key_count(self):
-		physical_nodes = set(self.VIEW.values())
-
-		return physical_nodes
-
+		return self.Physical_Nodes
 
 	# respond to view change request, perform a reshard
 	def view_change(self, new_view):
-		pass
+		
+		# are we adding a new node to the current view
+		if len(new_view) > len(self.Physical_Nodes):
+			pass
+
+		# if we are removing node from the current view
+		elif len(new_view) < len(self.Physical_Nodes):
+			pass
+
+		# must be replacing a node 
+		else:
+			pass
 
 	# perform binary search on VIEW given ring value
 	# we need to be careful about wrap around case. If ring_val is max_int, wrap to 0
