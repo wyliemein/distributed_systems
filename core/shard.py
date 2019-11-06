@@ -1,9 +1,9 @@
 # partitioning algorithm
-# implements consistent hashing 
+# implements consistent hashing with virtual nodes
 
 # procedure
-# 1. hash nodes then apply modulo number of nodes in system
-# 2. hash "data" then apply modulo number of nodes in system
+# 1. hash nodes by IP address
+# 2. hash "data" by key
 
 # each data packet corresponds to a node on a unit circle of integers
 # ownership of data is defined as:
@@ -11,6 +11,8 @@
 #	the data between two nodes on the circle
 
 import xxhash
+import random, string
+from bisect import bisect_left
 from database import Database # want to be able to use Database methods
 
 # create a shard given database class
@@ -18,23 +20,64 @@ class Partition(Database):
 	"""docstring for consistent_hash class"""
 	def __init__(self, IP, view):
 		Database.__init__(self)
-		self.peers = []
+		self.virtual_range = 10
+		self.hasher = xxhash.xxh32()
 		self.IP = IP
-		self.view = view
+		self.VIEW = []
+		self.LABELS = {}
+		self.initial_view(view)
 
-	# hash server to ring
-	# use concept of virtual node, each node is mapped to multiple places in the ring
-	# this produces further even distribution
-	def map_server(self):
-		pass
+	# construct initial view given ip/port pairs
+	# use concept of virtual nodes
+	def initial_view(self, view):
 
-	# hash data to ring
-	def map_data(self):
-		pass
+		unsorted_list = {}
+
+		# insert ip addresses into dict
+		for ip_port in view:
+			for v_num in range(self.virtual_range):
+
+				virtural_node = ip_port + str(v_num)
+				ring_num = self.hasher.digest(virtural_node) # unique value on "ring"
+
+				unsorted_list.append(ring_num)
+				self.LABELS[ring_num] = ip_port
+
+		# we want to store ring values in sorted list
+		self.VIEW = unsorted_list.sort()
+
+	# perform a key operation, ie find the correct node given key
+	def key_op(self, key):
+		
+		ring_val = self.hasher.digest(key)
+
+		node_ring_val = self.find_node(ring_val) 
+		ip_port = self.LABELS[node_ring_val]
+
+		return ip_port
+
+	# return list of nodes to query which can be done in app
+	def key_count(self):
+		physical_nodes = set(self.VIEW.values())
+
+		return physical_nodes
+
 
 	# respond to view change request, perform a reshard
-	def view_change(self):
+	def view_change(self, new_view):
 		pass
+
+	# perform binary search on VIEW given ring value
+	# we need to be careful about wrap around case. If ring_val is max_int, wrap to 0
+	def find_node(self, ring_val):
+
+		if abs(ring_val) == (2 ** 31 - 1):
+			print("must wrap around") 
+			node_num = sel.VIEW[0]
+			return node_num
+
+		node_num = self.VIEW[bisect_right(self.VIEW, ring_val)] 
+		return node_num
 
 
 
