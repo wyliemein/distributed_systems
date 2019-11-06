@@ -1,5 +1,4 @@
-# network_node.py
-# listen to requests
+# listen to requests clients and internal shards
 
 from flask import Flask, request, jsonify, make_response
 import json
@@ -17,40 +16,38 @@ def root():
 # get/put/delete key for shard
 @app.route("/kv-store/keys/<keyName>", methods=["GET", "PUT", "DELETE"])
 def update_keys(keyName):
-	
-	if (request.method == "GET"):
-		return jsonify({
-			"not implemented"		: "just a test"
-		}), 200
 
-	elif (request.method == "PUT"):
-		return jsonify({
-			"not implemented"		: "just a test"
-		}), 200
+	# get the shard that is storing this key, or new shard
+	key_shard = shard.key_op(keyName)
 
-	elif (request.method == "DELETE"):
-		return jsonify({
-			"not implemented"		: "just a test"
-		}), 200
+	op = request.method
+	data = request.get_json()
+
+	# we have the key locally
+	if (key_shard.IP == shard.IP):
+		return exec_op(op, data)
 
 	else:
-		return jsonify({
-			"error"		: "somethings not right"
-		}), 400
+		return forward(key_shard, op, data)
 
 # get number of keys in system
 @app.route("/kv-store/key-count", methods=["GET"])
 def get_key_count():
-	return jsonify({
-			"not implemented"		: "just a test"
-		}), 200
+	# call shard.key_count()
+	pass
 
 # change our current view, repartition keys
 @app.route("/kv-store/view-change", methods=["PUT"])
 def new_view():
-	return jsonify({
-			"not implemented"		: "just a test"
-		}), 200
+	# call shard.view_change(new_view)
+	pass
+
+# forward 
+def forward(ADDRESS, method, data):
+	pass
+
+def exec_op(method, data):
+	pass
 
 # run the servers
 if __name__ == "__main__":
@@ -58,10 +55,10 @@ if __name__ == "__main__":
 	# exract view and ip
 	VIEW_STR = os.environ["VIEW"]
 	views = VIEW_STR.split(",")
-	IP_PORT = os.environ["ADDRESS"].split(":")
+	ADDRESS = os.environ["ADDRESS"]
 
 	# create initial shard for this node, hash this shard
-	shard = Partition(IP_PORT[0], views)
+	shard = Partition(ADDRESS, views)
 
 	app.run(host='0.0.0.0', port=13800, debug=True)
 
