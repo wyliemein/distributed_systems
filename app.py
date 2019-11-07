@@ -1,6 +1,7 @@
 from flask import Flask, request, jsonify, make_response
 import json
 from Database import Database
+from shard import shard
 import os
 import requests
 
@@ -22,6 +23,11 @@ def kvstore(keyName):
 		: DELETE	-> delete a key
 	'''
 	if (request.method == "GET"):
+		bucket = shard.key_op(keyName)
+		#if(bucket == #current node):
+		#	database.getKey()
+		#else:
+			#forward GET to node_Val = bucket
 		return database.readKey(keyName)
 	elif (request.method == "PUT"):
 		data = request.get_json()
