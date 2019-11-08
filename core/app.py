@@ -17,8 +17,13 @@ def root():
 @app.route("/kv-store/keys/<keyName>", methods=["GET", "PUT", "DELETE"])
 def update_keys(keyName):
 
+	return jsonify({
+				"hit"     : "you pinged me",
+				"message"   : "update_keys endpoint"
+		}), 200
+
 	# get the shard that is storing this key, or new shard
-	key_shard = shard.key_op(keyName)
+	"""key_shard = '10.10.0.3:13800' #shard.key_op(keyName)
 
 	op = request.method
 	data = request.get_json()
@@ -28,7 +33,8 @@ def update_keys(keyName):
 		return exec_op(op, data)
 
 	else:
-		return forward(key_shard, op, data)
+	path = '/kv-store/keys/'+keyName
+	return forward(key_shard, path, op, data)"""
 
 # get number of keys in system
 @app.route("/kv-store/key-count", methods=["GET"])
@@ -43,8 +49,27 @@ def new_view():
 	pass
 
 # forward 
-def forward(ADDRESS, method, data):
-	pass
+def forward(ADDRESS, path, method, data):
+
+	ip_port = ADDRESS.split(":")
+	endpoint = 'http://' + ip_port[0] + ":" + ip_port[1] + path
+	headers = {'content-type': 'application/json', 'Accept-Charset': 'UTF-8'}
+			
+	# make recursive type call but to different ip
+	if method == "PUT":
+		r = requests.put(endpoint, data=data, headers=headers)
+		return make_response(r.content, r.status_code)
+	elif method == "GET":
+		r = requests.get(endpoint, data=data, headers=headers)
+		return make_response(r.content, r.status_code)
+	elif method == "DELETE":
+		r = requests.delete(endpoint, data=data, headers=headers)
+		return make_response(r.content, r.status_code)
+	else:
+		return jsonify({
+				"error"     : "invalid requests method",
+				"message"   : "Error in forward"
+		}), 400
 
 def exec_op(method, data):
 	pass
