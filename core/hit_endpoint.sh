@@ -9,3 +9,4 @@ curl --request GET \
 	 --data '{"value": "sampleValue"}'          \
 	 --write-out '%{http_code}\n' \
 	 http://127.0.0.1:13802/kv-store/keys/sampleKey
+s

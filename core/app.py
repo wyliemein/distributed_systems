@@ -6,21 +6,30 @@ import os
 import requests
 
 # import shard class
-from shard import Partition
+from Node import Node
 
 app = Flask(__name__)
+
+node = Node()
+
 @app.route("/")
 def root():
-	return "Home: CS 138: Assignment 3"
+	return node.returnInfo()
 
 # get/put/delete key for shard
 @app.route("/kv-store/keys/<keyName>", methods=["GET", "PUT", "DELETE"])
 def update_keys(keyName):
-
-	return jsonify({
-				"hit"     : "you pinged me",
-				"message"   : "update_keys endpoint"
-		}), 200
+	if (request.method == "GET"):
+		return node.readKey(keyName)
+	elif (request.method == "PUT"):
+		data = request.get_json()
+		return node.insertKey(keyName, data.get("value"))
+	elif (request.method == "DELETE"):
+		return node.removeKey(keyName)
+	else:
+		return jsonify({
+			"error"		: "somethings not right"
+		}), 400
 
 	# get the shard that is storing this key, or new shard
 	"""key_shard = '10.10.0.3:13800' #shard.key_op(keyName)
@@ -46,7 +55,7 @@ def get_key_count():
 @app.route("/kv-store/view-change", methods=["PUT"])
 def new_view():
 	# call shard.view_change(new_view)
-	pass
+	return True
 
 # forward 
 def forward(ADDRESS, path, method, data):
@@ -74,16 +83,18 @@ def forward(ADDRESS, path, method, data):
 def exec_op(method, data):
 	pass
 
+
 # run the servers
 if __name__ == "__main__":
-
-	# exract view and ip
+	# exract view and ip from environment
 	VIEW_STR = os.environ["VIEW"]
-	views = VIEW_STR.split(",")
 	ADDRESS = os.environ["ADDRESS"]
-
+	node.setInfo(ADDRESS, VIEW_STR.split(","))
+	# others = VIEW_STR.split(",")
+	
+	# node.setIp(ADDRESS)
 	# create initial shard for this node, hash this shard
-	shard = Partition(ADDRESS, views)
+	# shard = Partition(ADDRESS, views)
 
 	app.run(host='0.0.0.0', port=13800, debug=True)
 
