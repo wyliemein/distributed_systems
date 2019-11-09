@@ -12,44 +12,65 @@
 
 import xxhash as hasher
 import random, string
-from bisect import bisect_left
+from bisect import bisect_right
 from database import Database # want to be able to use Database methods
 
 # create a shard given database class
 class Partition(Database):
 	"""docstring for consistent_hash class"""
-	def __init__(self, IP, view):
+	def __init__(self, address, view):
 		Database.__init__(self)
-		self.virtual_range = 10
-		self.IP = IP
+		self.virtual_range = 10 # parameter for number of virtual nodes
+		self.prime = 691        # parameter for hash mod value
+		self.ADDRESS = address
 		self.Physical_Nodes = view
 		self.VIEW = []
-		self.LABELS = {}
-		self.initial_view(view)
+		self.LABELS = {}       
+		self.initial_view(view) 
+		#self.distribution()
+		print(self.VIEW)
+
+	# hash frunction is a composit of xxhash modded by prime
+	def hash(self, key):
+		hash_val = hasher.xxh32(key).intdigest()
+
+		# may be expensive but will produce better distribution
+		return (hash_val % self.prime) 
 
 	# construct initial view given ip/port pairs
 	# use concept of virtual nodes
+	# must handle collisions
 	def initial_view(self, view):
-
-		unsorted_list = []
 
 		# insert ip addresses into dict
 		for ip_port in view:
-			for v_num in range(self.virtual_range):
-
-				virtural_node = ip_port + str(v_num)
-				ring_num = hasher.xxh32(virtural_node).digest() # unique value on "ring"
-
-				unsorted_list.append(ring_num)
-				self.LABELS[ring_num] = ip_port
+			
+			self.add_node(ip_port)
 
 		# we want to store ring values in sorted list
-		self.VIEW = unsorted_list.sort()
+		self.VIEW.sort()
+
+	# given node address, hash and create virtual nodes
+	# after this method is called, self.VIEW should be sorted
+	def add_node(self, ADDRESS):
+
+		for v_num in range(self.virtual_range):
+
+			virtural_node = ADDRESS + str(v_num)
+			ring_num = self.hash(virtural_node) # unique value on "ring"
+
+			# if ring_num is already in unsorted list, skip this iteration
+			if ring_num in self.VIEW:
+				print("hash collision detected")
+				continue
+
+			self.VIEW.append(ring_num)
+			self.LABELS[ring_num] = ADDRESS
 
 	# perform a key operation, ie find the correct node given key
 	def key_op(self, key):
 		
-		ring_val = hasher.xxh32(key).digest()
+		ring_val = self.hash(key)
 
 		node_ring_val = self.find_node(ring_val) 
 		ip_port = self.LABELS[node_ring_val]
@@ -64,24 +85,15 @@ class Partition(Database):
 	# this can only be done if all nodes have been given new view
 	def view_change(self, new_view):
 
-		new_physical_view = self.update_view(new_view) # add or remove nodes
-
-		self.reshard(new_physical_view) # reshard 
-
-	# perform a reshard, re-distribute minimun number of keys
-	def reshard(self, new_physical_view):
-		pass
-		
-	def update_view(self, new_view):
 		# are we adding a new node to the current view
 		if len(new_view) > len(self.Physical_Nodes):
 			new_nodes = []
 
 			for ip_port in new_view:
 				if ip_port not in self.Physical_Nodes:
-					new_nodes.append(ip_port)
+					self.Physical_Nodes.append(ip_port)
 
-			# do something with new_nodes
+					# add node here
 
 		# if we are removing node from the current view
 		elif len(new_view) < len(self.Physical_Nodes):
@@ -91,17 +103,31 @@ class Partition(Database):
 		else:
 			pass
 
+	# perform a reshard, re-distribute minimun number of keys
+	def reshard(self, new_physical_view):
+		pass
+
 	# perform binary search on VIEW given ring value
 	# we need to be careful about wrap around case. If ring_val is max_int, wrap to 0
 	def find_node(self, ring_val):
 
-		if abs(ring_val) == (2 ** 31 - 1):
+		if abs(ring_val) == (self.prime - 1):
 			print("must wrap around") 
-			node_num = sel.VIEW[0]
+			node_num = self.VIEW[0]
 			return node_num
 
-		node_num = self.VIEW[bisect_right(self.VIEW, ring_val)] 
-		return node_num
+		print(ring_val)
+		node_num = bisect_right(self.VIEW, ring_val)
+		if node_num:
+			return self.VIEW[node_num]
+		raise ValueError
+
+	# find the distribution of keys to physical nodes
+	def distribution(self):
+		print("analyzing the distribution of nodes and keys")
+
+		for v in self.LABELS:
+			print("virtural_node:", v, " -- physical_node:", self.LABELS[v])
 
 
 
