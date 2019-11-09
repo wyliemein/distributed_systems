@@ -1,4 +1,6 @@
-docker network create --subnet=10.10.0.0/16 kv_subnet
+docker stop node2
+
+docker rm node2
 
 docker build -t kv-store:3.0 .
 
@@ -11,11 +13,12 @@ addr3="10.10.0.4:13800"
 initial_full_view="${addr1},${addr2}"
 full_view=${initial_full_view},${addr3}
 
- docker run -p 13800:13800 \
+docker run -p 13803:13800 \
 		--net=kv_subnet \
 		--ip=10.10.0.3 \
-		--name="node1" \
-		-e ADDRESS="${addr1}" \
+		--name="node2" \
+		-e ADDRESS="${addr2}" \
 		-e VIEW=${initial_full_view} \
 		kv-store:3.0
+
 
