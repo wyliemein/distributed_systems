@@ -26,13 +26,36 @@ def update_keys(keyName):
 
 	else:
 		path = '/kv-store/keys/'+keyName
-		return forward(key_shard, path, keyName)
+		op = request.method
+		return forward(key_shard, path, op, keyName)
 
 # get number of keys in system
 @app.route("/kv-store/key-count", methods=["GET"])
 def get_key_count():
-	# call shard.key_count()
-	pass
+
+	all_nodes = shard.key_count()
+	path = '/kv-store/internal/key_count'
+	op = "GET"
+	keys = 0
+
+	for node in all_nodes:
+		# message node and ask them how many nodes you have
+		try:
+			res = forward(node, path, op, 'key_count')
+			node_keys = res.content
+			print(node_keys)
+			#keys += node_keys
+		except:
+			pass
+
+# internal messaging endpoint so that we can determine if a client or node is pinging us
+@app.route("/kv-store/internal/key-count", methods=["GET"])
+def internal_key_count():
+	key_count = shard.numberOfKeys()
+
+	return jsonify({
+				"key_count" : key_count
+	}), 200
 
 # change our current view, repartition keys
 @app.route("/kv-store/view-change", methods=["PUT"])
@@ -41,9 +64,8 @@ def new_view():
 	pass
 
 # forward 
-def forward(ADDRESS, path, keyName):
+def forward(ADDRESS, path, op, keyName):
 
-	op = request.method
 	ip_port = ADDRESS.split(":")
 	endpoint = 'http://' + ip_port[0] + ":" + ip_port[1] + path
 	headers = {'content-type': 'application/json', 'Accept-Charset': 'UTF-8'}
@@ -52,7 +74,8 @@ def forward(ADDRESS, path, keyName):
 	# since this is a forward, add the forwarded address to response
 	if op == "PUT":
 		data = request.get_json()
-		r = requests.put(endpoint, data=data, headers=headers)
+		payload = json.dumps(data)
+		r = requests.put(endpoint, data=payload, headers=headers)
 		return make_response(r.content, r.status_code)
 
 	elif op == "GET":
@@ -75,7 +98,8 @@ def exec_op(keyName):
 	
 	if op == "PUT":
 		data = request.get_json()
-		return shard.insertKey(keyName, data)
+		value = data.get("value")
+		return shard.insertKey(keyName, value)
 
 	elif op == "GET":
 		return shard.readKey(keyName)
