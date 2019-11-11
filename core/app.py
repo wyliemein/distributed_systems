@@ -33,20 +33,22 @@ def update_keys(keyName):
 @app.route("/kv-store/key-count", methods=["GET"])
 def get_key_count():
 
-	all_nodes = shard.key_count()
-	path = '/kv-store/internal/key_count'
+	all_nodes = shard.all_nodes()
+	path = '/kv-store/internal/key-count'
 	op = "GET"
-	keys = 0
+	keys = shard.numberOfKeys()
 
 	for node in all_nodes:
+		if node == shard.ADDRESS:
+			continue
+
 		# message node and ask them how many nodes you have
-		try:
-			res = forward(node, path, op, 'key_count')
-			node_keys = res.content
-			print(node_keys)
-			#keys += node_keys
-		except:
-			pass
+		res = forward(node, path, op, 'key_count')
+		return make_response(res, 200)
+		node_keys = res.content
+		keys += node_keys
+
+	#return make_response({"keys: ":keys}, 200)
 
 # internal messaging endpoint so that we can determine if a client or node is pinging us
 @app.route("/kv-store/internal/key-count", methods=["GET"])
@@ -54,7 +56,7 @@ def internal_key_count():
 	key_count = shard.numberOfKeys()
 
 	return jsonify({
-				"key_count" : key_count
+				"internal keys"     : key_count
 	}), 200
 
 # change our current view, repartition keys
@@ -69,6 +71,12 @@ def forward(ADDRESS, path, op, keyName):
 	ip_port = ADDRESS.split(":")
 	endpoint = 'http://' + ip_port[0] + ":" + ip_port[1] + path
 	headers = {'content-type': 'application/json', 'Accept-Charset': 'UTF-8'}
+
+	"""return jsonify({
+				"forward"   : path,
+				"ADDRESS"   : ADDRESS,
+				"operation" : op
+	}), 200"""
 			
 	# make recursive type call but to different ip
 	# since this is a forward, add the forwarded address to response
@@ -105,7 +113,7 @@ def exec_op(keyName):
 		return shard.readKey(keyName)
 
 	elif op == "DELETE":
-		removed = shard.removeKey(keyName)
+		return shard.removeKey(keyName)
 
 	else:
 		return jsonify({

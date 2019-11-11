@@ -78,7 +78,7 @@ class Partition(Database):
 		return ip_port
 
 	# return list of nodes to query which can be done in app
-	def key_count(self):
+	def all_nodes(self):
 		return self.Physical_Nodes
 
 	# respond to view change request, perform a reshard
