@@ -4,31 +4,63 @@ from flask import Flask, request, jsonify, make_response
 import json
 import os
 import requests
+import sys
 
 # import shard class
-from shard import Partition
+from Node import Node
 
 app = Flask(__name__)
+
+node = Node()
+
 @app.route("/")
 def root():
-	return "Home: CS 138: Assignment 3"
+	return node.returnInfo()
 
 # get/put/delete key for shard
 @app.route("/kv-store/keys/<keyName>", methods=["GET", "PUT", "DELETE"])
 def update_keys(keyName):
+	data = request.get_json()
 
-	# get the shard address that is storing this key, or new shard
-	key_shard = shard.key_op(keyName)
+	if (request.method == "GET"):
+		if (data is None):
+				data = {
+					"forward" : False
+				}
+		if node.containsKey(keyName):
+			return node.readKey(keyName, data["forward"])
+		else:
+			correctNode = node.hashKey(keyName)
+			data["forward"] = True
+			internal = False
+			return forward(node.others[correctNode], "/kv-store/keys/"+keyName, "GET", data, internal)
 
-	# we have the key locally
-	if (key_shard == shard.ADDRESS):
-		return exec_op(keyName)
+	elif (request.method == "PUT"):
+		if (node.keyBelongsHere(keyName)):
+			return node.insertKey(keyName, data.get("value"), ("forward" in data))
+		# key doesnt belong here
+		data["forward"] = True
+		correctNode = node.hashKey(keyName)
+		print(data, file=sys.stderr)
+		internal = False
+		return forward(node.others[correctNode], "/kv-store/keys/"+keyName, "PUT", data, internal)
 
+	elif (request.method == "DELETE"):
+		if (data is None):
+				data = {
+					"forward" : False
+				}
+		if node.containsKey(keyName):
+			return node.removeKey(keyName, data["forward"])
+		else:
+			correctNode = node.hashKey(keyName)
+			data["forward"] = True
+			internal = False
+			return forward(node.others[correctNode], "/kv-store/keys/"+keyName, "DELETE", data, internal)
 	else:
-		path = '/kv-store/keys/'+keyName
-		op = request.method
-		internal_request = False
-		return forward(key_shard, path, op, keyName, internal_request)
+		return jsonify({
+			"error"		: "somethings not right"
+		}), 400
 
 # get number of keys in system
 @app.route("/kv-store/key-count", methods=["GET"])
@@ -65,7 +97,7 @@ def internal_key_count():
 @app.route("/kv-store/view-change", methods=["PUT"])
 def new_view():
 	# call shard.view_change(new_view)
-	pass
+	return True
 
 # forward 
 def forward(ADDRESS, path, op, keyName, internal):
@@ -98,43 +130,18 @@ def forward(ADDRESS, path, op, keyName, internal):
 				"message"   : "Error in forward"
 		}), 400
 
-# perform key operation with local database
-def exec_op(keyName):
-	op = request.method
-	
-	if op == "PUT":
-		data = request.get_json()
-		value = data.get("value")
-		return shard.insertKey(keyName, value)
-
-	elif op == "GET":
-		return shard.readKey(keyName)
-
-	elif op == "DELETE":
-		return shard.removeKey(keyName)
-
-	else:
-		return jsonify({
-				"error"     : "invalid requests method",
-				"message"   : "Error in exec_op"
-		}), 400
-
 
 # run the servers
 if __name__ == "__main__":
-
-	# exract view and ip
+	# exract view and ip from environment
 	VIEW_STR = os.environ["VIEW"]
-	views = VIEW_STR.split(",")
 	ADDRESS = os.environ["ADDRESS"]
-
+	node.setInfo(ADDRESS, VIEW_STR.split(","))
+	# others = VIEW_STR.split(",")
+	
+	# node.setIp(ADDRESS)
 	# create initial shard for this node, hash this shard
-	shard = Partition(ADDRESS, views)
+	# shard = Partition(ADDRESS, views)
 
 	app.run(host='0.0.0.0', port=13800, debug=True)
-
-
-
-
-
 
