@@ -27,7 +27,8 @@ def update_keys(keyName):
 	else:
 		path = '/kv-store/keys/'+keyName
 		op = request.method
-		return forward(key_shard, path, op, keyName)
+		internal_request = False
+		return forward(key_shard, path, op, keyName, internal_request)
 
 # get number of keys in system
 @app.route("/kv-store/key-count", methods=["GET"])
@@ -43,12 +44,13 @@ def get_key_count():
 			continue
 
 		# message node and ask them how many nodes you have
-		res = forward(node, path, op, 'key_count')
-		return make_response(res, 200)
-		node_keys = res.content
-		keys += node_keys
+		# we want forward to return response content not response
+		internal_request = True
+		res = forward(node, path, op, 'key_count', internal_request)
+		jsonResponse = json.loads(res.decode('utf-8'))
+		keys += jsonResponse['keys']
 
-	#return make_response({"keys: ":keys}, 200)
+	return make_response({"keys: ":keys}, 200)
 
 # internal messaging endpoint so that we can determine if a client or node is pinging us
 @app.route("/kv-store/internal/key-count", methods=["GET"])
@@ -56,7 +58,7 @@ def internal_key_count():
 	key_count = shard.numberOfKeys()
 
 	return jsonify({
-				"internal keys"     : key_count
+				"keys"     : key_count
 	}), 200
 
 # change our current view, repartition keys
@@ -66,17 +68,11 @@ def new_view():
 	pass
 
 # forward 
-def forward(ADDRESS, path, op, keyName):
+def forward(ADDRESS, path, op, keyName, internal):
 
 	ip_port = ADDRESS.split(":")
 	endpoint = 'http://' + ip_port[0] + ":" + ip_port[1] + path
 	headers = {'content-type': 'application/json', 'Accept-Charset': 'UTF-8'}
-
-	"""return jsonify({
-				"forward"   : path,
-				"ADDRESS"   : ADDRESS,
-				"operation" : op
-	}), 200"""
 			
 	# make recursive type call but to different ip
 	# since this is a forward, add the forwarded address to response
@@ -88,6 +84,8 @@ def forward(ADDRESS, path, op, keyName):
 
 	elif op == "GET":
 		r = requests.get(endpoint, data=keyName, headers=headers)
+		if internal:
+			return r.content
 		return make_response(r.content, r.status_code)
 
 	elif op == "DELETE":
