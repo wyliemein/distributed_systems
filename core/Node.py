@@ -23,7 +23,7 @@ class Node():
 
     def all_nodes(self):
         # return all nodes in our current view
-        pass
+        return self.others
 
     """
         Functions below only read from the database

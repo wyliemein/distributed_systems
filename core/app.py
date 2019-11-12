@@ -66,19 +66,19 @@ def update_keys(keyName):
 @app.route("/kv-store/key-count", methods=["GET"])
 def get_key_count():
 
-	all_nodes = shard.all_nodes()
+	all_nodes = node.all_nodes()
 	path = '/kv-store/internal/key-count'
 	op = "GET"
-	keys = shard.numberOfKeys()
+	keys = node.numberOfKeys()
 
-	for node in all_nodes:
-		if node == shard.ADDRESS:
+	for shard in all_nodes:
+		if shard == node.IPAddress:
 			continue
 
 		# message node and ask them how many nodes you have
 		# we want forward to return response content not response
 		internal_request = True
-		res = forward(node, path, op, 'key_count', internal_request)
+		res = forward(shard, path, op, 'key_count', internal_request)
 		jsonResponse = json.loads(res.decode('utf-8'))
 		keys += jsonResponse['keys']
 
@@ -87,7 +87,7 @@ def get_key_count():
 # internal messaging endpoint so that we can determine if a client or node is pinging us
 @app.route("/kv-store/internal/key-count", methods=["GET"])
 def internal_key_count():
-	key_count = shard.numberOfKeys()
+	key_count = node.numberOfKeys()
 
 	return jsonify({
 				"keys"     : key_count
@@ -96,7 +96,7 @@ def internal_key_count():
 # change our current view, repartition keys
 @app.route("/kv-store/view-change", methods=["PUT"])
 def new_view():
-	# call shard.view_change(new_view)
+	# call node.view_change(new_view)
 	return True
 
 # forward 
@@ -138,10 +138,7 @@ if __name__ == "__main__":
 	ADDRESS = os.environ["ADDRESS"]
 	node.setInfo(ADDRESS, VIEW_STR.split(","))
 	# others = VIEW_STR.split(",")
-	
-	# node.setIp(ADDRESS)
-	# create initial shard for this node, hash this shard
-	# shard = Partition(ADDRESS, views)
+
 
 	app.run(host='0.0.0.0', port=13800, debug=True)
 
