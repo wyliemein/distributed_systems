@@ -33,13 +33,13 @@ def update_keys(keyName):
 
 	# we have the key locally
 	if (key_shard == shard.ADDRESS):
-		return local_operation(keyName)
+		return shard.local_operation(keyName)
 
 	else:
 		path = '/kv-store/keys/'+keyName
 		op = request.method
 		internal_request = False
-		return forward(key_shard, path, op, keyName, internal_request)
+		return shard.ping(key_shard, path, op, keyName, internal_request)
 
 # get number of keys in system
 @app.route("/kv-store/key-count", methods=["GET"])
@@ -57,7 +57,7 @@ def get_key_count():
 		# message node and ask them how many nodes you have
 		# we want forward to return response content not response
 		internal_request = True
-		res = forward(node, path, op, 'key_count', internal_request)
+		res = shard.ping(node, path, op, 'key_count', internal_request)
 		jsonResponse = json.loads(res.decode('utf-8'))
 		keys += jsonResponse['keys']
 
@@ -77,59 +77,6 @@ def internal_key_count():
 def new_view():
 	# call shard.view_change(new_view)
 	pass
-
-# forward 
-def forward(ADDRESS, path, op, keyName, internal):
-
-	ip_port = ADDRESS.split(":")
-	endpoint = 'http://' + ip_port[0] + ":" + ip_port[1] + path
-	headers = {'content-type': 'application/json', 'Accept-Charset': 'UTF-8'}
-			
-	# make recursive type call but to different ip
-	# since this is a forward, add the forwarded address to response
-	if op == "PUT":
-		data = request.get_json()
-		payload = json.dumps(data)
-		r = requests.put(endpoint, data=payload, headers=headers)
-		return make_response(r.content, r.status_code)
-
-	elif op == "GET":
-		r = requests.get(endpoint, data=keyName, headers=headers)
-		if internal:
-			return r.content
-		return make_response(r.content, r.status_code)
-
-	elif op == "DELETE":
-		r = requests.delete(endpoint, data=keyName, headers=headers)
-		return make_response(r.content, r.status_code)
-
-	else:
-		return jsonify({
-				"error"     : "invalid requests method",
-				"message"   : "Error in forward"
-		}), 400
-
-# perform key operation with local database
-def local_operation(keyName):
-	op = request.method
-	
-	if op == "PUT":
-		data = request.get_json()
-		value = data.get("value")
-		return shard.insertKey(keyName, value)
-
-	elif op == "GET":
-		return shard.readKey(keyName)
-
-	elif op == "DELETE":
-		return shard.removeKey(keyName)
-
-	else:
-		return jsonify({
-				"error"     : "invalid requests method",
-				"message"   : "Error in exec_op"
-		}), 400
-
 
 # run the servers
 if __name__ == "__main__":

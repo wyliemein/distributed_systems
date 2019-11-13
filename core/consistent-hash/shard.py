@@ -15,6 +15,9 @@ import random, string
 from bisect import bisect_right
 from storage_host import Database 
 from datetime import datetime
+from flask import Flask, request, jsonify, make_response
+import requests
+import json
 
 """ 
 create a shard which stores addess of nodes in a hash ring
@@ -149,29 +152,30 @@ class Partition(Database):
 	"""
 	def view_change(self, new_view):
 
-		# are we adding a new node to the current view
-		if len(new_view) > len(self.Physical_Nodes):
-			new_nodes = []
+		add_nodes = new_view - self.Physical_Nodes
+		remove_nodes = self.Physical_Nodes - new_view
 
-			for ip_port in new_view:
-				if ip_port not in self.Physical_Nodes:
-					self.Physical_Nodes.append(ip_port)
-
-					# add node here
-
-		# if we are removing node from the current view
-		elif len(new_view) < len(self.Physical_Nodes):
+		# add nodes to ring
+		for shard in add_nodes:
 			pass
 
-		# must be replacing a node 
+		# remove nodes from ring
+		for shard in remove_nodes:
+			add = True
+			self.reshard(add, shard)
+
+	"""
+	Perform a reshard, re-distribute minimun number of keys
+	Need to get keys for given node
+	"""
+	def reshard(self, method, node):
+		
+		if method:
+			pass
+
 		else:
-			pass
-
-	"""
-	perform a reshard, re-distribute minimun number of keys
-	"""
-	def reshard(self, new_physical_view):
-		pass
+			# re-shard node's keys
+			keys = node
 
 	"""
 	Prints all events which have occured on this database
@@ -188,6 +192,62 @@ class Partition(Database):
 		for event in self.history:
 			output = output + event[0] + ": " + event[1].strftime("%m/%d/%Y, %H:%M:%S") + "<br>"
 		return output + "</center>"
+
+	"""
+	ping another node given address and path 
+	"""
+	def ping(self, ADDRESS, path, op, keyName, internal):
+
+		ip_port = ADDRESS.split(":")
+		endpoint = 'http://' + ip_port[0] + ":" + ip_port[1] + path
+		headers = {'content-type': 'application/json', 'Accept-Charset': 'UTF-8'}
+				
+		# make recursive type call but to different ip
+		# since this is a forward, add the forwarded address to response
+		if op == "PUT":
+			data = request.get_json()
+			payload = json.dumps(data)
+			r = requests.put(endpoint, data=payload, headers=headers)
+			return make_response(r.content, r.status_code)
+
+		elif op == "GET":
+			r = requests.get(endpoint, data=keyName, headers=headers)
+			if internal:
+				return r.content
+			return make_response(r.content, r.status_code)
+
+		elif op == "DELETE":
+			r = requests.delete(endpoint, data=keyName, headers=headers)
+			return make_response(r.content, r.status_code)
+
+		else:
+			return jsonify({
+					"error"     : "invalid requests method",
+					"message"   : "Error in forward"
+			}), 400
+
+	"""
+	perform a local database operation
+	"""
+	def local_operation(self, keyName):
+		op = request.method
+		
+		if op == "PUT":
+			data = request.get_json()
+			value = data.get("value")
+			return self.insertKey(keyName, value)
+
+		elif op == "GET":
+			return self.readKey(keyName)
+
+		elif op == "DELETE":
+			return self.removeKey(keyName)
+
+		else:
+			return jsonify({
+					"error"     : "invalid requests method",
+					"message"   : "Error in exec_op"
+			}), 400
 
 
 
