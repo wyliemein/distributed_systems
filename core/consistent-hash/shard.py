@@ -157,41 +157,48 @@ class Partition(Database):
 
 		# add nodes to ring
 		for shard in add_nodes:
-			pass
+			add = True
+			self.reshard(add, shard)
+			# hash
 
 		# remove nodes from ring
 		for shard in remove_nodes:
-			add = True
-			self.reshard(add, shard)
+
+			# find the next node on ring after shard
+			# find all virtual nodes associated with next node
+			shard_ring_val = self.hash(shard)
+			next_node = self.find_node(shard_ring_val)
+
+
+			add = False
+			self.reshard(add, shard, next_node)
 
 	"""
 	Perform a reshard, re-distribute minimun number of keys
-	Need to get keys for given node
+	transfer keys from node to next node
 	"""
-	def reshard(self, method, node):
+	def reshard(self, adding, node, next_node):
 		
-		if method:
+		if adding:
 			pass
 
 		else:
-			# re-shard node's keys
-			keys = node
+			if node == self.ADDRESS: # we are removing self
+				key_val = self.allKeys()
+			else:
 
-	"""
-	Prints all events which have occured on this database
-	"""
-	def print_history(self):
-		for event in self.history:
-			print(event[0] + ": " + event[1].strftime("%m/%d/%Y, %H:%M:%S"))
+				path = '/kv-store/internal/all-keys'
+				op = 'GET'
+				internal_request = True
+				key = ''
+				
+				res = self.ping(node, path, op, key, internal_request)
+				jsonResponse = json.loads(res.decode('utf-8'))
+				key_val += jsonResponse['all_keys']
 
-	"""
-	Prints all events which have occured on this database
-	"""
-	def return_history(self):
-		output = "<center>"
-		for event in self.history:
-			output = output + event[0] + ": " + event[1].strftime("%m/%d/%Y, %H:%M:%S") + "<br>"
-		return output + "</center>"
+		# add key-val to next_node
+		for key in key_val:
+			pass
 
 	"""
 	ping another node given address and path 
@@ -248,6 +255,24 @@ class Partition(Database):
 					"error"     : "invalid requests method",
 					"message"   : "Error in exec_op"
 			}), 400
+
+
+	"""
+	Prints all events which have occured on this database
+	"""
+	def print_history(self):
+		for event in self.history:
+			print(event[0] + ": " + event[1].strftime("%m/%d/%Y, %H:%M:%S"))
+
+	"""
+	Prints all events which have occured on this database
+	"""
+	def return_history(self):
+		output = "<center>"
+		for event in self.history:
+			output = output + event[0] + ": " + event[1].strftime("%m/%d/%Y, %H:%M:%S") + "<br>"
+		return output + "</center>"
+
 
 
 

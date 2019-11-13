@@ -59,7 +59,7 @@ def get_key_count():
 		internal_request = True
 		res = shard.ping(node, path, op, 'key_count', internal_request)
 		jsonResponse = json.loads(res.decode('utf-8'))
-		keys += jsonResponse['keys']
+		keys += jsonResponse['key_count']
 
 	return make_response({"keys: ":keys}, 200)
 
@@ -69,7 +69,16 @@ def internal_key_count():
 	key_count = shard.numberOfKeys()
 
 	return jsonify({
-				"keys"     : key_count
+				"key_count"     : key_count
+	}), 200
+
+# internal messaging endpoint to get all keys
+@app.route("/kv-store/internal/all-keys", methods=["GET"])
+def all_keys():
+	key_val = shard.allKeys()
+
+	return jsonify({
+				"all_keys"     : key_val
 	}), 200
 
 # change our current view, repartition keys
