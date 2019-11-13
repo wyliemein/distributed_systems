@@ -36,17 +36,26 @@ class Partition(Database):
 		#self.distribution()
 
 	def __repr__(self):
-		return {'ADDRESS':self.ADDRESS, '\nVIEW':self.Physical_Nodes, '\nHASHED':self.VIEW}
+		return {'ADDRESS':self.ADDRESS, 'VIEW':self.Physical_Nodes, 'HASHED':self.LABELS}
 
 	def __str__(self):
-		return 'Person(ADDRESS='+self.ADDRESS+', \nVIEW='+str(self.Physical_Nodes)+ '\nHASHED' + self.VIEW + ')'
+		return 'ADDRESS = '+self.ADDRESS+'\nVIEW = '+(', '.join(map(str, self.Physical_Nodes))) + '\nHASHED = ' + (', '.join(map(str, self.VIEW)))
 
 	"""
 	give a state report 
-	this includes all transactions and distribution of keys to nodes
+	this includes node data and distribution of keys to nodes
 	"""
 	def state_report(self):
-		pass
+		state = self.__repr__()
+
+		string = "node"
+		itr = 1
+		for node in self.distribution:
+			key = string + str(itr)
+			itr += 1
+			state[key] = self.distribution[node]
+
+		return state
 
 	"""
 	hash frunction is a composit of xxhash modded by prime
@@ -89,7 +98,7 @@ class Partition(Database):
 
 			# if ring_num is already in unsorted list, skip this iteration
 			if ring_num in self.VIEW:
-				print("hash collision detected")
+				print("system: Hash collision detected")
 				continue
 
 			self.VIEW.append(ring_num)
@@ -163,13 +172,6 @@ class Partition(Database):
 	"""
 	def reshard(self, new_physical_view):
 		pass
-
-	# find the distribution of keys to physical nodes
-	def distribution(self):
-		print("analyzing the distribution of nodes and keys")
-
-		for v in self.LABELS:
-			print("virtural_node:", v, " -- physical_node:", self.LABELS[v])
 
 	"""
 	Prints all events which have occured on this database

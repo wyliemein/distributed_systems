@@ -13,6 +13,17 @@ app = Flask(__name__)
 def root():
 	return "Home: CS 138: Assignment 3"
 
+# get the current state
+@app.route("/kv-store/state", methods=["GET"])
+def state():
+	state = shard.state_report()
+	str_state = json.dumps(state)
+	json_state = json.loads(str_state)
+	
+	return jsonify({
+				"node state:"     : json_state
+	}), 200
+
 # get/put/delete key for shard
 @app.route("/kv-store/keys/<keyName>", methods=["GET", "PUT", "DELETE"])
 def update_keys(keyName):
@@ -130,6 +141,7 @@ if __name__ == "__main__":
 
 	# create initial shard for this node, hash this shard
 	shard = Partition(ADDRESS, views)
+	#print(shard.state_report())
 
 	app.run(host='0.0.0.0', port=13800, debug=True)
 
