@@ -87,6 +87,9 @@ class Partition(Database):
 	'''
 	def add_node(self, ADDRESS):
 
+		if ADDRESS not in self.Physical_Nodes:
+			self.Physical_Nodes.append(ADDRESS)
+			
 		new_nodes = []
 		for v_num in range(self.virtual_range):
 
@@ -137,7 +140,7 @@ class Partition(Database):
 
 		if direction == 'predecessor':
 			node_num = bisect_right(self.VIEW, ring_val)
-			if node_num:
+			if node_num != len(self.VIEW):
 				return self.VIEW[node_num]
 			return False
 
@@ -176,7 +179,8 @@ class Partition(Database):
 	belong to new node
 	'''
 	def reshard(self, adding, node):
-		
+		status_code = 0
+
 		if adding:
 
 			# hash new node and create virlual nodes
@@ -190,14 +194,16 @@ class Partition(Database):
 				if successor == False:
 					successor == (self.prime - 1) # if no successor, scan till end of ring
 
-				if bounded and self.LABELS[predecessor] == self.ADDRESS:
+				if predecessor and self.LABELS[predecessor] == self.ADDRESS:
 					# this instance contains keys that need to be re-distributed
 					ack = self.transfer(predecessor, v, successor) # we now have the keys to swap
 
 					if ack == False:
-						raise Exception("key transfer failed with error code", ack)
+						status_code += 1
 		else:
 			pass
+
+		return status_code
 
 	'''
 	this instance must be the predecessor of the new v-node

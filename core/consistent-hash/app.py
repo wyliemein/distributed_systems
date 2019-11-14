@@ -101,18 +101,18 @@ def new_view():
 		if res.status_code != 200:
 			return make_response("error in spreading new new view", 500)
 
-	#try:
-		# perform the key re-shard
 	shard.view_change(view.split(','))
-	#except:
-	#	return make_response('caught error in shard view change', 500)
+	
+	return jsonify({
+			'new_view'     : view
+	}), 200
 
 # internal endpoint for viewchange
 @app.route("/kv-store/internal/view-change", methods=["PUT"])
 def spread_view():
 	
 	view = (request.get_data().decode('utf8')).split(',')
-	#shard.view_change(view)
+	shard.view_change(view)
 
 	return jsonify({
 			'new_view'     : view[0]
