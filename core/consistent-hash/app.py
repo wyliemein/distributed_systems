@@ -96,15 +96,15 @@ def new_view():
 			continue
 
 		res = router.PUT(node, path, view, forward)
-		#jsonResponse = json.loads(res.decode('utf-8'))
-		#view = jsonResponse['new_view']
+
 		if res.status_code != 200:
 			return make_response("error in spreading new new view", 500)
 
-	shard.view_change(view.split(','))
+	errors = shard.view_change(view.split(','))
 	
 	return jsonify({
-			'new_view'     : view
+			'new_view'     : view,
+			'errors'	   : errors
 	}), 200
 
 # internal endpoint for viewchange
@@ -112,10 +112,11 @@ def new_view():
 def spread_view():
 	
 	view = (request.get_data().decode('utf8')).split(',')
-	shard.view_change(view)
+	errors = shard.view_change(view)
 
 	return jsonify({
-			'new_view'     : view[0]
+			'new_view'     : view,
+			'errors'	   : errors
 	}), 200
 
 # perfrom operation on node's shard

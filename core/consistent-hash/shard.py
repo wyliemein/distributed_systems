@@ -11,7 +11,6 @@
 #	the data between two nodes on the circle
 
 import xxhash as hasher
-import random, string
 from bisect import bisect_right, bisect_left
 from storage_host import Database 
 from datetime import datetime
@@ -89,7 +88,7 @@ class Partition(Database):
 
 		if ADDRESS not in self.Physical_Nodes:
 			self.Physical_Nodes.append(ADDRESS)
-			
+
 		new_nodes = []
 		for v_num in range(self.virtual_range):
 
@@ -159,19 +158,22 @@ class Partition(Database):
 	'''
 	def view_change(self, new_view):
 
+		status_code = 0
 		add_nodes = list(set(new_view) - set(self.Physical_Nodes))
 		remove_nodes = list(set(self.Physical_Nodes) - set(new_view))
 
 		# add nodes to ring
 		for shard in add_nodes:
 			add = True
-			self.reshard(add, shard)
+			status_code += self.reshard(add, shard)
 
 		# remove nodes from ring
 		for shard in remove_nodes:
 
 			add = False
-			self.reshard(add, shard)
+			status_code += self.reshard(add, shard)
+
+		return status_code
 
 	'''
 	Perform a reshard, re-distribute minimun number of keys
@@ -183,7 +185,7 @@ class Partition(Database):
 
 		if adding:
 
-			# hash new node and create virlual nodes
+			# hash new node and create virtual nodes
 			new_virtual_nodes = self.add_node(node)
 
 			for v in new_virtual_nodes:
@@ -198,8 +200,7 @@ class Partition(Database):
 					# this instance contains keys that need to be re-distributed
 					ack = self.transfer(predecessor, v, successor) # we now have the keys to swap
 
-					if ack == False:
-						status_code += 1
+					status_code += ack
 		else:
 			pass
 
@@ -224,13 +225,14 @@ class Partition(Database):
 				path = '/kv-store/keys/' + key
 				string_dict = json.dumps({key:self.keystore[key]})
 				data = json.loads(string_dict)
-				forward = False
+				forward = True
 
 				res = self.router.PUT(address, path, data, forward)
 
+				# we were successful in transfering the key
 				if res.status_code == 201:
-					# delete key from self.keystore
-					pass
+					del self.keystore[key]
+
 				else:
 					# error occured
 					status += 1
