@@ -3,7 +3,7 @@
 
 # procedure
 # 1. hash nodes by IP address
-# 2. hash "data" by key
+# 2. hash 'data' by key
 
 # each data packet corresponds to a node on a unit circle of integers
 # ownership of data is defined as:
@@ -15,17 +15,14 @@ import random, string
 from bisect import bisect_right
 from storage_host import Database 
 from datetime import datetime
-from flask import Flask, request, jsonify, make_response
-import requests
-import json
 
-""" 
+''' 
 create a shard which stores addess of nodes in a hash ring
 inherits from database.py
-"""
+'''
 class Partition(Database):
-	"""docstring for consistent_hash class"""
-	def __init__(self, address, view):
+	'''docstring for consistent_hash class'''
+	def __init__(self, router, address, view):
 		Database.__init__(self, address)
 		self.virtual_range = 10 # parameter for number of virtual nodes
 		self.prime = 691        # parameter for hash mod value
@@ -35,23 +32,24 @@ class Partition(Database):
 		self.LABELS = {}      
 		self.initial_view(view) 
 		self.distribution = {ip:0 for ip in self.Physical_Nodes} 
+		self.router = router
 		
 		#self.distribution()
 
 	def __repr__(self):
-		return {'ADDRESS':self.ADDRESS, 'VIEW':self.Physical_Nodes, 'HASHED':self.LABELS}
+		return {'ADDRESS':self.ADDRESS, 'VIEW':self.Physical_Nodes, 'VIRTUAL_NODES':self.LABELS}
 
 	def __str__(self):
 		return 'ADDRESS = '+self.ADDRESS+'\nVIEW = '+(', '.join(map(str, self.Physical_Nodes))) + '\nHASHED = ' + (', '.join(map(str, self.VIEW)))
 
-	"""
+	'''
 	give a state report 
 	this includes node data and distribution of keys to nodes
-	"""
+	'''
 	def state_report(self):
 		state = self.__repr__()
 
-		string = "node"
+		string = 'node'
 		itr = 1
 		for node in self.distribution:
 			key = string + str(itr)
@@ -60,20 +58,20 @@ class Partition(Database):
 
 		return state
 
-	"""
+	'''
 	hash frunction is a composit of xxhash modded by prime
-	"""
+	'''
 	def hash(self, key):
 		hash_val = hasher.xxh32(key).intdigest()
 
 		# may be expensive but will produce better distribution
 		return (hash_val % self.prime) 
 
-	"""
+	'''
 	construct initial view given ip/port pairs
 	use concept of virtual nodes
 	must handle collisions
-	"""
+	'''
 	def initial_view(self, view):
 
 		# insert ip addresses into dict
@@ -84,34 +82,34 @@ class Partition(Database):
 		# we want to store ring values in sorted list
 		self.VIEW.sort()
 
-	def all_nodes(self):
-		# return all nodes in our current view
-		return self.Physical_Nodes
-
-	"""
+	'''
 	given node address, hash and create virtual nodes
 	after this method is called, self.VIEW should be sorted
-	"""
+	'''
 	def add_node(self, ADDRESS):
 
+		new_nodes = []
 		for v_num in range(self.virtual_range):
 
 			virtural_node = ADDRESS + str(v_num)
-			ring_num = self.hash(virtural_node) # unique value on "ring"
+			ring_num = self.hash(virtural_node) # unique value on 'ring'
 
 			# if ring_num is already in unsorted list, skip this iteration
 			if ring_num in self.VIEW:
-				print("system: Hash collision detected")
+				print('system: Hash collision detected')
 				continue
 
 			self.VIEW.append(ring_num)
 			self.LABELS[ring_num] = ADDRESS
+			new_nodes.append(ring_num)
 
-	"""
+		return new_nodes
+
+	'''
 	Perform a key operation, ie find the correct node given key
 	First hash the key then perform binary search to find the correct node
 	to store the key
-	"""
+	'''
 	def find_match(self, key):
 		
 		ring_val = self.hash(key)
@@ -127,14 +125,14 @@ class Partition(Database):
 
 		return ip_port
 
-	"""
+	'''
 	perform binary search on VIEW given ring value
 	we need to be careful about wrap around case. If ring_val >= max_ring_val, return 0
-	"""
+	'''
 	def find_node(self, ring_val):
 
 		if abs(ring_val) == (self.prime - 1):
-			print("must wrap around") 
+			print('must wrap around') 
 			node_num = self.VIEW[0]
 			return node_num
 
@@ -146,10 +144,43 @@ class Partition(Database):
 	def all_nodes(self):
 		return self.Physical_Nodes
 
-	"""
+	'''
+	Return all keys in next_node that have a hash value between 
+	node and next_node
+	'''
+	def key_range(self, node, next_node):
+		
+		if self.LABELS[node] == self.ADDRESS:
+			return self.keyRange(node, next_node)
+
+		path = '/kv-store/internal/key-range'
+		internal_request = True
+		key = str(node) + ',' + str(next_node)
+
+		res = self.router.GET(node, path, key, internal_request)
+
+		jsonResponse = json.loads(res.decode('utf-8'))
+		key_val = jsonResponse['all_keys']
+
+		return key_val
+
+	'''
+	return all local keys in range
+	'''
+	def keyRange(self, curr, next):
+		kv = {}
+		for key in self.keystore:
+			ring_val = self.hash(key)
+
+			if ring_val > curr and ring_val < next:
+				kv[key] = self.keystore[key]
+
+		return kv
+
+	'''
 	respond to view change request, perform a reshard
 	this can only be done if all nodes have been given new view
-	"""
+	'''
 	def view_change(self, new_view):
 
 		add_nodes = new_view - self.Physical_Nodes
@@ -159,119 +190,63 @@ class Partition(Database):
 		for shard in add_nodes:
 			add = True
 			self.reshard(add, shard)
-			# hash
 
 		# remove nodes from ring
 		for shard in remove_nodes:
 
-			# find the next node on ring after shard
-			# find all virtual nodes associated with next node
-			shard_ring_val = self.hash(shard)
-			next_node = self.find_node(shard_ring_val)
-
-
 			add = False
-			self.reshard(add, shard, next_node)
+			self.reshard(add, shard)
 
-	"""
+	'''
 	Perform a reshard, re-distribute minimun number of keys
-	transfer keys from node to next node
-	"""
-	def reshard(self, adding, node, next_node):
+	Transfer all keys between new node and successor that should
+	belong to this node
+	'''
+	def reshard(self, adding, node):
 		
 		if adding:
-			pass
+			# hash new node and create virlual nodes
+			new_virtual_nodes = self.add_node(node)
+
+			for v in new_virtual_nodes:
+
+				successor = self.find_node(v)
+				key_val = self.key_range(v, successor) # we now have the keys to swap
 
 		else:
 			if node == self.ADDRESS: # we are removing self
 				key_val = self.allKeys()
 			else:
 
-				path = '/kv-store/internal/all-keys'
-				op = 'GET'
-				internal_request = True
-				key = ''
-				
-				res = self.ping(node, path, op, key, internal_request)
-				jsonResponse = json.loads(res.decode('utf-8'))
-				key_val += jsonResponse['all_keys']
+				kye_val = self.node_keys(node)
 
-		# add key-val to next_node
-		for key in key_val:
-			pass
+			# add key-val to next_node
+			# remove node from possible storage
+			for key in key_val:
 
-	"""
-	ping another node given address and path 
-	"""
-	def ping(self, ADDRESS, path, op, keyName, internal):
+				ADDRESS = self.find_match(key)
+				op = 'PUT' 
+				path = '/kv-store/keys/<keyName>'
+				internal_request = False
 
-		ip_port = ADDRESS.split(":")
-		endpoint = 'http://' + ip_port[0] + ":" + ip_port[1] + path
-		headers = {'content-type': 'application/json', 'Accept-Charset': 'UTF-8'}
-				
-		# make recursive type call but to different ip
-		# since this is a forward, add the forwarded address to response
-		if op == "PUT":
-			data = request.get_json()
-			payload = json.dumps(data)
-			r = requests.put(endpoint, data=payload, headers=headers)
-			return make_response(r.content, r.status_code)
+				# add key-val 
+				pass
 
-		elif op == "GET":
-			r = requests.get(endpoint, data=keyName, headers=headers)
-			if internal:
-				return r.content
-			return make_response(r.content, r.status_code)
-
-		elif op == "DELETE":
-			r = requests.delete(endpoint, data=keyName, headers=headers)
-			return make_response(r.content, r.status_code)
-
-		else:
-			return jsonify({
-					"error"     : "invalid requests method",
-					"message"   : "Error in forward"
-			}), 400
-
-	"""
-	perform a local database operation
-	"""
-	def local_operation(self, keyName):
-		op = request.method
-		
-		if op == "PUT":
-			data = request.get_json()
-			value = data.get("value")
-			return self.insertKey(keyName, value)
-
-		elif op == "GET":
-			return self.readKey(keyName)
-
-		elif op == "DELETE":
-			return self.removeKey(keyName)
-
-		else:
-			return jsonify({
-					"error"     : "invalid requests method",
-					"message"   : "Error in exec_op"
-			}), 400
-
-
-	"""
+	'''
 	Prints all events which have occured on this database
-	"""
+	'''
 	def print_history(self):
 		for event in self.history:
-			print(event[0] + ": " + event[1].strftime("%m/%d/%Y, %H:%M:%S"))
+			print(event[0] + ': ' + event[1].strftime('%m/%d/%Y, %H:%M:%S'))
 
-	"""
+	'''
 	Prints all events which have occured on this database
-	"""
+	'''
 	def return_history(self):
-		output = "<center>"
+		output = '<center>'
 		for event in self.history:
-			output = output + event[0] + ": " + event[1].strftime("%m/%d/%Y, %H:%M:%S") + "<br>"
-		return output + "</center>"
+			output = output + event[0] + ': ' + event[1].strftime('%m/%d/%Y, %H:%M:%S') + '<br>'
+		return output + '</center>'
 
 
 

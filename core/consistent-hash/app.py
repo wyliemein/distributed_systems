@@ -9,6 +9,7 @@ import requests
 from shard import Partition
 
 app = Flask(__name__)
+
 @app.route("/")
 def root():
 	return "Home: CS 138: Assignment 3"
@@ -33,13 +34,16 @@ def update_keys(keyName):
 
 	# we have the key locally
 	if (key_shard == shard.ADDRESS):
-		return shard.local_operation(keyName)
+		method = request.method
+		return local_operation(method, keyName)
 
 	else:
 		path = '/kv-store/keys/'+keyName
-		op = request.method
-		internal_request = False
-		return shard.ping(key_shard, path, op, keyName, internal_request)
+		method = request.method
+		forward = False
+		data = None
+
+		return router.FORWARD(key_shard, method, path, keyName, data, forward)
 
 # get number of keys in system
 @app.route("/kv-store/key-count", methods=["GET"])
@@ -47,7 +51,7 @@ def get_key_count():
 
 	all_nodes = shard.all_nodes()
 	path = '/kv-store/internal/key-count'
-	op = "GET"
+	method = 'GET'
 	keys = shard.numberOfKeys()
 
 	for node in all_nodes:
@@ -57,7 +61,10 @@ def get_key_count():
 		# message node and ask them how many nodes you have
 		# we want forward to return response content not response
 		internal_request = True
-		res = shard.ping(node, path, op, 'key_count', internal_request)
+		data = None
+
+		# ADDRESS, PATH, OP, keyName, DATA, FORWARD
+		res = router.FORWARD(node, method, path, 'key_count', data, internal_request)
 		jsonResponse = json.loads(res.decode('utf-8'))
 		keys += jsonResponse['key_count']
 
@@ -73,9 +80,13 @@ def internal_key_count():
 	}), 200
 
 # internal messaging endpoint to get all keys
-@app.route("/kv-store/internal/all-keys", methods=["GET"])
-def all_keys():
-	key_val = shard.allKeys()
+@app.route("/kv-store/internal/key-range/keyRange", methods=["GET"])
+def all_keys(keyRange):
+
+	head = keyRange.split(",")[0]
+	tail = keyRange.split(",")[1]
+
+	key_val = shard.keyRange(head, tail)
 
 	return jsonify({
 				"all_keys"     : key_val
@@ -87,6 +98,91 @@ def new_view():
 	# call shard.view_change(new_view)
 	pass
 
+def local_operation(self, keyName):
+	method = request.method
+	
+	if method == 'PUT':
+		data = request.get_json()
+		value = data.get('value')
+		return shard.insertKey(keyName, value)
+
+	elif method == 'GET':
+		return shard.readKey(keyName)
+
+	elif method == 'DELETE':
+		return shard.removeKey(keyName)
+
+	else:
+		return jsonify({
+				'error'     : 'invalid requests method',
+				'message'   : 'Error in exec_op'
+		}), 400
+
+
+class Message():
+	def __init__(self):
+		self.methods = ['GET', 'POST', 'DELETE']
+
+	def base(self, address, path):
+		ip_port = address.split(':')
+		endpoint = 'http://' + ip_port[0] + ':' + ip_port[1] + path
+		headers = {'content-type': 'application/json', 'Accept-Charset': 'UTF-8'}
+		return endpoint, headers
+
+	def GET(self, address, path, query, forward):
+		
+		endpoint, header = self.base(address, path)
+
+		r = requests.get(endpoint, data=query, headers=header)
+
+		# we want content not response
+		if forward:
+			return r.content
+
+		return make_response(r.content, r.status_code)
+
+	def PUT(self, address, path, data, forward):
+		
+		endpoint, header = self.base(address, path)
+
+		if data == None:
+			data = request.get_json() 
+			data = json.dumps(data) 
+
+		r = requests.put(endpoint, data=data, headers=header)
+
+		if forward:
+			return r.content
+
+		return make_response(r.content, r.status_code)
+
+	def DELETE(self, address, path, query, forward):
+		
+		endpoint, header = self.base(address, path)
+
+		r = requests.delete(endpoint, data=query, headers=header)
+		
+		if forward:
+			return r.content
+
+		return make_response(r.content, r.status_code)
+
+	def FORWARD(self, address, method, path, query, data, forward):
+		if method == 'GET':
+			return self.GET(address, path, query, forward)
+
+		elif method == 'PUT':
+			return self.PUT(address, path, data, forward)
+
+		elif method == 'DELETE':
+			return self.DELETE(address, path, query, forward)
+
+		else:
+			return jsonify({
+				'error'     : 'invalid requests method',
+				'message'   : 'Error in exec_op'
+			}), 400
+
 # run the servers
 if __name__ == "__main__":
 
@@ -96,8 +192,8 @@ if __name__ == "__main__":
 	ADDRESS = os.environ["ADDRESS"]
 
 	# create initial shard for this node, hash this shard
-	shard = Partition(ADDRESS, views)
-	#print(shard.state_report())
+	router = Message()
+	shard = Partition(router, ADDRESS, views)
 
 	app.run(host='0.0.0.0', port=13800, debug=True)
 
