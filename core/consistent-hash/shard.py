@@ -12,7 +12,7 @@
 
 import xxhash as hasher
 import random, string
-from bisect import bisect_right
+from bisect import bisect_right, bisect_left
 from storage_host import Database 
 from datetime import datetime
 import json
@@ -139,13 +139,13 @@ class Partition(Database):
 			node_num = bisect_right(self.VIEW, ring_val)
 			if node_num:
 				return self.VIEW[node_num]
-			raise ValueError
+			return False
 
 		elif direction == 'successor':
 			node_num = bisect_left(self.VIEW, ring_val)
 			if node_num:
 				return self.VIEW[node_num-1]
-			raise ValueError
+			return False
 
 	def all_nodes(self):
 		return self.Physical_Nodes
@@ -156,8 +156,8 @@ class Partition(Database):
 	'''
 	def view_change(self, new_view):
 
-		add_nodes = new_view - self.Physical_Nodes
-		remove_nodes = self.Physical_Nodes - new_view
+		add_nodes = list(set(new_view) - set(self.Physical_Nodes))
+		remove_nodes = list(set(self.Physical_Nodes) - set(new_view))
 
 		# add nodes to ring
 		for shard in add_nodes:
@@ -169,6 +169,35 @@ class Partition(Database):
 
 			add = False
 			self.reshard(add, shard)
+
+	'''
+	Perform a reshard, re-distribute minimun number of keys
+	Transfer all keys between new node and successor that should
+	belong to new node
+	'''
+	def reshard(self, adding, node):
+		
+		if adding:
+
+			# hash new node and create virlual nodes
+			new_virtual_nodes = self.add_node(node)
+
+			for v in new_virtual_nodes:
+
+				successor = self.find_node('successor', v)
+				predecessor = self.find_node('predecessor', v)
+
+				if successor == False:
+					successor == (self.prime - 1) # if no successor, scan till end of ring
+
+				if bounded and self.LABELS[predecessor] == self.ADDRESS:
+					# this instance contains keys that need to be re-distributed
+					ack = self.transfer(predecessor, v, successor) # we now have the keys to swap
+
+					if ack == False:
+						raise Exception("key transfer failed with error code", ack)
+		else:
+			pass
 
 	'''
 	this instance must be the predecessor of the new v-node
@@ -201,32 +230,6 @@ class Partition(Database):
 					status += 1
 
 		return status	
-
-	'''
-	Perform a reshard, re-distribute minimun number of keys
-	Transfer all keys between new node and successor that should
-	belong to new node
-	'''
-	def reshard(self, adding, node):
-		
-		if adding:
-
-			# hash new node and create virlual nodes
-			new_virtual_nodes = self.add_node(node)
-
-			for v in new_virtual_nodes:
-
-				successor = self.find_node('successor', v) # return the ring value of next virtual node
-				predecessor = self.find_node('predecessor', v)
-
-				if self.LABELS[predecessor] == self.ADDRESS:
-					# this instance contains keys that need to be re-distributed
-					ack = self.transfer(predecessor, v, successor) # we now have the keys to swap
-
-					if ack == False:
-						raise Exception("key transfer failed with error code", ack)
-		else:
-			pass
 
 	'''
 	Prints all events which have occured on this database

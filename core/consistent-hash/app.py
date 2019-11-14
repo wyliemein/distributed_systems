@@ -88,7 +88,7 @@ def new_view():
 	method = 'PUT'
 	data = request.get_json()
 	view = data.get('view')
-	forward = False
+	forward = True
 
 	all_nodes = shard.all_nodes()
 	for node in all_nodes:
@@ -99,17 +99,20 @@ def new_view():
 		#jsonResponse = json.loads(res.decode('utf-8'))
 		#view = jsonResponse['new_view']
 		if res.status_code != 200:
-			make_response("error in spreading new new view", 500)
+			return make_response("error in spreading new new view", 500)
 
-	# perform the key re-shard
+	#try:
+		# perform the key re-shard
 	shard.view_change(view.split(','))
+	#except:
+	#	return make_response('caught error in shard view change', 500)
 
 # internal endpoint for viewchange
 @app.route("/kv-store/internal/view-change", methods=["PUT"])
 def spread_view():
 	
 	view = (request.get_data().decode('utf8')).split(',')
-	shard.view_change(view)
+	#shard.view_change(view)
 
 	return jsonify({
 			'new_view'     : view[0]
