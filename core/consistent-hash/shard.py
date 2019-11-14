@@ -15,6 +15,7 @@ import random, string
 from bisect import bisect_right
 from storage_host import Database 
 from datetime import datetime
+import json
 
 ''' 
 create a shard which stores addess of nodes in a hash ring
@@ -33,8 +34,6 @@ class Partition(Database):
 		self.initial_view(view) 
 		self.distribution = {ip:0 for ip in self.Physical_Nodes} 
 		self.router = router
-		
-		#self.distribution()
 
 	def __repr__(self):
 		return {'ADDRESS':self.ADDRESS, 'VIEW':self.Physical_Nodes, 'VIRTUAL_NODES':self.LABELS}
@@ -144,9 +143,9 @@ class Partition(Database):
 
 		elif direction == 'successor':
 			node_num = bisect_left(self.VIEW, ring_val)
-		    if node_num:
-		        return self.VIEW[node_num-1]
-		    raise ValueError
+			if node_num:
+				return self.VIEW[node_num-1]
+			raise ValueError
 
 	def all_nodes(self):
 		return self.Physical_Nodes
@@ -175,8 +174,10 @@ class Partition(Database):
 	this instance must be the predecessor of the new v-node
 	now need to transfer keys from predecessor to new v-node
 	'''
-	def key_range(self, predecessor, new_node, successor):
+	def transfer(self, predecessor, new_node, successor):
 		
+		status = 0
+
 		for key in self.keystore:
 			ring_val = self.hash(key)
 
@@ -184,7 +185,22 @@ class Partition(Database):
 				
 				# transfer key-val to new node 
 				# once transfered, delete from predecessor
-				pass
+				address = self.LABELS[new_node]
+				path = '/kv-store/keys/' + key
+				string_dict = json.dumps({key:self.keystore[key]})
+				data = json.loads(string_dict)
+				forward = False
+
+				res = self.router.PUT(address, path, data, forward)
+
+				if res.status_code == 201:
+					# delete key from self.keystore
+					pass
+				else:
+					# error occured
+					status += 1
+
+		return status	
 
 	'''
 	Perform a reshard, re-distribute minimun number of keys
@@ -194,8 +210,6 @@ class Partition(Database):
 	def reshard(self, adding, node):
 		
 		if adding:
-
-			kv = {} # temporary key-val pairs
 
 			# hash new node and create virlual nodes
 			new_virtual_nodes = self.add_node(node)
@@ -207,9 +221,10 @@ class Partition(Database):
 
 				if self.LABELS[predecessor] == self.ADDRESS:
 					# this instance contains keys that need to be re-distributed
-					ack = self.key_range(predecessor, v, successor) # we now have the keys to swap
+					ack = self.transfer(predecessor, v, successor) # we now have the keys to swap
 
-
+					if ack == False:
+						raise Exception("key transfer failed with error code", ack)
 		else:
 			pass
 

@@ -40,7 +40,7 @@ def update_keys(keyName):
 	else:
 		path = '/kv-store/keys/'+keyName
 		method = request.method
-		forward = False
+		forward = True
 		data = None
 
 		return router.FORWARD(key_shard, method, path, keyName, data, forward)
@@ -60,11 +60,11 @@ def get_key_count():
 
 		# message node and ask them how many nodes you have
 		# we want forward to return response content not response
-		internal_request = True
+		forward = False
 		data = None
 
 		# ADDRESS, PATH, OP, keyName, DATA, FORWARD
-		res = router.FORWARD(node, method, path, 'key_count', data, internal_request)
+		res = router.GET(node, path, data, forward)
 		jsonResponse = json.loads(res.decode('utf-8'))
 		keys += jsonResponse['key_count']
 
@@ -79,27 +79,43 @@ def internal_key_count():
 				"key_count"     : key_count
 	}), 200
 
-# internal messaging endpoint to get all keys
-@app.route("/kv-store/internal/key-range/keyRange", methods=["GET"])
-def all_keys(keyRange):
-
-	head = keyRange.split(",")[0]
-	tail = keyRange.split(",")[1]
-
-	key_val = shard.keyRange(head, tail)
-
-	return jsonify({
-				"all_keys"     : key_val
-	}), 200
-
 # change our current view, repartition keys
-# before we send keys, make sure new node is up
+# before we send keys, make sure new node is up 
 @app.route("/kv-store/view-change", methods=["PUT"])
 def new_view():
+	
+	path = '/kv-store/internal/view-change'
+	method = 'PUT'
+	data = request.get_json()
+	view = data.get('view')
+	forward = False
+
+	all_nodes = shard.all_nodes()
+	for node in all_nodes:
+		if node == shard.ADDRESS:
+			continue
+
+		res = router.PUT(node, path, view, forward)
+		#jsonResponse = json.loads(res.decode('utf-8'))
+		#view = jsonResponse['new_view']
+		if res.status_code != 200:
+			make_response("error in spreading new new view", 500)
+
+	# perform the key re-shard
+	shard.view_change(view.split(','))
+
+# internal endpoint for viewchange
+@app.route("/kv-store/internal/view-change", methods=["PUT"])
+def spread_view():
+	
+	view = (request.get_data().decode('utf8')).split(',')
+	shard.view_change(view)
+
 	return jsonify({
-				"view-change"     : "conducting a view-change"
+			'new_view'     : view[0]
 	}), 200
 
+# perfrom operation on node's shard
 def local_operation(self, keyName):
 	method = request.method
 	
@@ -139,9 +155,9 @@ class Message():
 
 		# we want content not response
 		if forward:
-			return r.content
+			return make_response(r.content, r.status_code)
+		return r.content
 
-		return make_response(r.content, r.status_code)
 
 	def PUT(self, address, path, data, forward):
 		
@@ -154,9 +170,8 @@ class Message():
 		r = requests.put(endpoint, data=data, headers=header)
 
 		if forward:
-			return r.content
-
-		return make_response(r.content, r.status_code)
+			return make_response(r.content, r.status_code)
+		return r.content
 
 	def DELETE(self, address, path, query, forward):
 		
@@ -165,9 +180,8 @@ class Message():
 		r = requests.delete(endpoint, data=query, headers=header)
 		
 		if forward:
-			return r.content
-
-		return make_response(r.content, r.status_code)
+			return make_response(r.content, r.status_code)
+		return r.content
 
 	def FORWARD(self, address, method, path, query, data, forward):
 		if method == 'GET':
