@@ -115,7 +115,7 @@ class Partition(Database):
 		ring_val = self.hash(key)
 
 		# get the virtual ring number
-		node_ring_val = self.find_node(ring_val)
+		node_ring_val = self.find_node('predecessor', ring_val)
 
 		# convert to physical node ip
 		ip_port = self.LABELS[node_ring_val]
@@ -129,53 +129,27 @@ class Partition(Database):
 	perform binary search on VIEW given ring value
 	we need to be careful about wrap around case. If ring_val >= max_ring_val, return 0
 	'''
-	def find_node(self, ring_val):
+	def find_node(self, direction, ring_val):
 
 		if abs(ring_val) == (self.prime - 1):
 			print('must wrap around') 
 			node_num = self.VIEW[0]
 			return node_num
 
-		node_num = bisect_right(self.VIEW, ring_val)
-		if node_num:
-			return self.VIEW[node_num]
-		raise ValueError
+		if direction == 'predecessor':
+			node_num = bisect_right(self.VIEW, ring_val)
+			if node_num:
+				return self.VIEW[node_num]
+			raise ValueError
+
+		elif direction == 'successor':
+			node_num = bisect_left(self.VIEW, ring_val)
+		    if node_num:
+		        return self.VIEW[node_num-1]
+		    raise ValueError
 
 	def all_nodes(self):
 		return self.Physical_Nodes
-
-	'''
-	Return all keys in next_node that have a hash value between 
-	node and next_node
-	'''
-	def key_range(self, node, next_node):
-		
-		if self.LABELS[node] == self.ADDRESS:
-			return self.keyRange(node, next_node)
-
-		path = '/kv-store/internal/key-range'
-		internal_request = True
-		key = str(node) + ',' + str(next_node)
-
-		res = self.router.GET(node, path, key, internal_request)
-
-		jsonResponse = json.loads(res.decode('utf-8'))
-		key_val = jsonResponse['all_keys']
-
-		return key_val
-
-	'''
-	return all local keys in range
-	'''
-	def keyRange(self, curr, next):
-		kv = {}
-		for key in self.keystore:
-			ring_val = self.hash(key)
-
-			if ring_val > curr and ring_val < next:
-				kv[key] = self.keystore[key]
-
-		return kv
 
 	'''
 	respond to view change request, perform a reshard
@@ -198,39 +172,46 @@ class Partition(Database):
 			self.reshard(add, shard)
 
 	'''
+	this instance must be the predecessor of the new v-node
+	now need to transfer keys from predecessor to new v-node
+	'''
+	def key_range(self, predecessor, new_node, successor):
+		
+		for key in self.keystore:
+			ring_val = self.hash(key)
+
+			if ring_val > predecessor and ring_val < successor:
+				
+				# transfer key-val to new node 
+				# once transfered, delete from predecessor
+				pass
+
+	'''
 	Perform a reshard, re-distribute minimun number of keys
 	Transfer all keys between new node and successor that should
-	belong to this node
+	belong to new node
 	'''
 	def reshard(self, adding, node):
 		
 		if adding:
+
+			kv = {} # temporary key-val pairs
+
 			# hash new node and create virlual nodes
 			new_virtual_nodes = self.add_node(node)
 
 			for v in new_virtual_nodes:
 
-				successor = self.find_node(v)
-				key_val = self.key_range(v, successor) # we now have the keys to swap
+				successor = self.find_node('successor', v) # return the ring value of next virtual node
+				predecessor = self.find_node('predecessor', v)
+
+				if self.LABELS[predecessor] == self.ADDRESS:
+					# this instance contains keys that need to be re-distributed
+					ack = self.key_range(predecessor, v, successor) # we now have the keys to swap
+
 
 		else:
-			if node == self.ADDRESS: # we are removing self
-				key_val = self.allKeys()
-			else:
-
-				kye_val = self.node_keys(node)
-
-			# add key-val to next_node
-			# remove node from possible storage
-			for key in key_val:
-
-				ADDRESS = self.find_match(key)
-				op = 'PUT' 
-				path = '/kv-store/keys/<keyName>'
-				internal_request = False
-
-				# add key-val 
-				pass
+			pass
 
 	'''
 	Prints all events which have occured on this database

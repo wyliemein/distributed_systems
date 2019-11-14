@@ -93,10 +93,12 @@ def all_keys(keyRange):
 	}), 200
 
 # change our current view, repartition keys
+# before we send keys, make sure new node is up
 @app.route("/kv-store/view-change", methods=["PUT"])
 def new_view():
-	# call shard.view_change(new_view)
-	pass
+	return jsonify({
+				"view-change"     : "conducting a view-change"
+	}), 200
 
 def local_operation(self, keyName):
 	method = request.method
