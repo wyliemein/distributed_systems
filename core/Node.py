@@ -1,6 +1,8 @@
 from datetime import datetime
 from flask import jsonify
 
+import sys
+
 class Node():
 
     def __init__(self):
@@ -14,16 +16,12 @@ class Node():
     def setInfo(self,_IPAddress, _others):
         splitIP = _IPAddress.split(":")[0]
         self.port = 13800 + int((splitIP.split(".")[3]))
-        self.number = int((splitIP.split(".")[3])) - 1
+        self.number = int((splitIP.split(".")[3])) - 2
         self.IPAddress = _IPAddress
         self.others = _others
 
     def returnInfo(self):
         return "<center><b>Node {}</b><br>SUBNET IP: {}<br>ALL NODES({}): {}<br>".format(str(self.number), self.IPAddress,str(len(self.others)),str(self.others)) + "<br><b>KEYS   VALUES   NODE<b><br>" + self.returnAllKeysWithHash() + "<br><b>EVENTS:<b><br>" + self.returnHistory() + "</center>"
-
-    def all_nodes(self):
-        # return all nodes in our current view
-        return self.others
 
     """
         Functions below only read from the database
@@ -41,10 +39,32 @@ class Node():
         Returns the True if the key hash belongs on this node
         '''
         value = hash(key) % len(self.others)
-        if (value == self.number-1):
+        if (value == self.number):
             return True
         return False
 
+    def all_nodes(self):
+        # return all nodes in our current view
+        return self.others
+
+    def reshard(self,_othersString):
+        self.others = _othersString.split(",")
+        # create a temporary list of dictionaries of payloads to send k/v's to proper nodes
+        forward_data = []
+        for ip in self.others:
+            forward_data.append((ip,{}))
+        temporary_keystore = {}
+        for key in self.keystore:
+            if (self.keyBelongsHere(key) != True):
+                newHashValue = self.hashKey(key)
+                forward_data[newHashValue][1][key] = self.keystore[key]
+            else:
+                temporary_keystore[key] = self.keystore[key]
+        self.keystore = temporary_keystore
+        # now iterate through forward_data
+        # print(forward_data, file=sys.stderr)
+        return forward_data
+        
     def containsKey(self, key):
         '''
         Returns the True if the key is contained in the local database
@@ -98,8 +118,9 @@ class Node():
     def returnAllKeysWithHash(self):
         output = "<br><center>"
         for key in self.keystore:
-            output = output + "<b>" + key + ": " + self.keystore[key] + " -> Node " + str(self.hashKey(key) + 1) + "@ IP" + self.others[self.hashKey(key)] + "<br>"
+            output = output + "<b>" + key + ": " + self.keystore[key] + "<br>"
         return output + "</center>"
+
     """
         Functions below perform writes to the database
         
@@ -150,11 +171,6 @@ class Node():
                     "replaced"      : replaced,
                 }), 201
 
-    def forwardKey(self, key, value):
-        # TODO right here forward the key
-        return 
-    
-
     def removeKey(self, key, forward):
         '''
         Checks whether the key is found and removes it
@@ -183,7 +199,3 @@ class Node():
                 "error"         : "Key does not exist",
                 "message"       : "Error in DELETE"
             }), 404
-
-
-
-
