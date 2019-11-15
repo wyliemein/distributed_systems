@@ -158,22 +158,21 @@ class Partition(Database):
 	'''
 	def view_change(self, new_view):
 
-		status_code = 0
 		add_nodes = list(set(new_view) - set(self.Physical_Nodes))
 		remove_nodes = list(set(self.Physical_Nodes) - set(new_view))
 
 		# add nodes to ring
 		for shard in add_nodes:
 			add = True
-			status_code += self.reshard(add, shard)
+			self.reshard(add, shard)
 
 		# remove nodes from ring
 		for shard in remove_nodes:
 
 			add = False
-			status_code += self.reshard(add, shard)
+			self.reshard(add, shard)
 
-		return status_code
+		return self.ADDRESS, self.numberOfKeys()
 
 	'''
 	Perform a reshard, re-distribute minimun number of keys
@@ -181,8 +180,7 @@ class Partition(Database):
 	belong to new node
 	'''
 	def reshard(self, adding, node):
-		status_code = 0
-
+		# we are adding
 		if adding:
 
 			# hash new node and create virtual nodes
@@ -198,21 +196,17 @@ class Partition(Database):
 
 				if predecessor and self.LABELS[predecessor] == self.ADDRESS:
 					# this instance contains keys that need to be re-distributed
-					ack = self.transfer(predecessor, v, successor) # we now have the keys to swap
-
-					status_code += ack
+					address = self.transfer(predecessor, v, successor) # we now have the keys to swap
+		
+		# we are removing nodes 
 		else:
 			pass
-
-		return status_code
 
 	'''
 	this instance must be the predecessor of the new v-node
 	now need to transfer keys from predecessor to new v-node
 	'''
 	def transfer(self, predecessor, new_node, successor):
-		
-		status = 0
 
 		for key in self.keystore:
 			ring_val = self.hash(key)
@@ -235,9 +229,9 @@ class Partition(Database):
 
 				else:
 					# error occured
-					status += 1
+					raise Exception ("non 201 status_code in transfer")
 
-		return status	
+		return new_node
 
 	'''
 	Prints all events which have occured on this database

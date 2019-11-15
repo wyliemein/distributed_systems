@@ -66,9 +66,14 @@ def get_key_count():
 		# ADDRESS, PATH, OP, keyName, DATA, FORWARD
 		res = router.GET(node, path, data, forward)
 		jsonResponse = json.loads(res.decode('utf-8'))
-		keys += jsonResponse['key_count']
+		keys += (jsonResponse['key_count'])
 
-	return make_response({"keys: ":keys}, 200)
+	return jsonify({
+				"key-count"     : {
+					"message"   : "Key count retrieved successfully",
+					"key-count" : keys
+				}
+	}), 200 
 
 # internal messaging endpoint so that we can determine if a client or node is pinging us
 @app.route("/kv-store/internal/key-count", methods=["GET"])
@@ -88,35 +93,45 @@ def new_view():
 	method = 'PUT'
 	data = request.get_json()
 	view = data.get('view')
-	forward = True
+	forward = False
 
+	state = {}
+
+	# let all nodes know off the view change
 	all_nodes = shard.all_nodes()
 	for node in all_nodes:
 		if node == shard.ADDRESS:
 			continue
 
 		res = router.PUT(node, path, view, forward)
+		Response = json.loads(res.decode('utf-8'))
+		address = Response['ADDRESS']
+		keys = Response['keys']
+		state[address] = keys
 
-		if res.status_code != 200:
-			return make_response("error in spreading new new view", 500)
-
-	errors = shard.view_change(view.split(','))
+	address, keys = shard.view_change(view.split(','))
+	state[address] = keys
 	
-	return jsonify({
-			'new_view'     : view,
-			'errors'	   : errors
-	}), 200
+	response = {}
+	response['view-change'] = {"message": "View change successful", "shards": []}
+
+	for address in state:
+		response['view-change']['shards'].append({"address": address, "key-count": state[address]})
+
+	json_res = json.dumps(response)
+	return json_res, 200
 
 # internal endpoint for viewchange
 @app.route("/kv-store/internal/view-change", methods=["PUT"])
 def spread_view():
 	
 	view = (request.get_data().decode('utf8')).split(',')
-	errors = shard.view_change(view)
+	address, keys = shard.view_change(view)
 
 	return jsonify({
 			'new_view'     : view,
-			'errors'	   : errors
+			'ADDRESS'	   : address,
+			'keys' 		   : keys
 	}), 200
 
 # perfrom operation on node's shard
