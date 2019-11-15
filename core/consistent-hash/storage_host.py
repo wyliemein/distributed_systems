@@ -73,17 +73,19 @@ class Database():
             self.keystore[key] = value
             self.history.append(("Updated " + key + " to value " + value, datetime.now()))
             return jsonify({
-                "message"       : "Updated successfully",
-                "replaced"      : True,
-                "address"       : "TO DO",
+                "update-key"        : {
+                    "message"       : "Updated successfully",
+                    "replaced"      : True
+                }
             }), 201
         else:
             self.keystore[key] = value
             self.history.append(("Added " + key + " with value " + value, datetime.now()))
             return jsonify({
-                "message"       : "Added successfully",
-                "replaced"      : False,
-                "address"       : "TO DO",
+                "insert-key"    : {
+                    "message"       : "Added successfully",
+                    "replaced"      : False
+                }
             }), 201
 
     def removeKey(self, key):
@@ -95,7 +97,18 @@ class Database():
         if (self.containsKey(key)):
             del self.keystore[key]
             self.history.append(("Removed " + key, datetime.now()))
-            return True
+            return jsonify({
+                "delete-key"    : {
+                    "message"  : "Deleted successfully",
+                    "doesExist": True
+                }
+            }), 201
         else:
-            return False
+            return jsonify({
+                "delete-key": {
+                    "message"  : "Error in DELETE",
+                    "error"    : "Key does not exist",
+                    "doesExist": false
+                }
+            }), 201
 

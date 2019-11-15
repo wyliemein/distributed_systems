@@ -63,7 +63,7 @@ def get_key_count():
 		data = None
 
 		# ADDRESS, PATH, OP, keyName, DATA, FORWARD
-		res = router.GET(node, path, data, forward)
+		res, status_code = router.GET(node, path, data, forward)
 		jsonResponse = json.loads(res.decode('utf-8'))
 		keys += (jsonResponse['key_count'])
 
@@ -102,7 +102,7 @@ def new_view():
 		if node == shard.ADDRESS:
 			continue
 
-		res = router.PUT(node, path, view, forward)
+		res, status_code = router.PUT(node, path, view, forward)
 		Response = json.loads(res.decode('utf-8'))
 		address = Response['ADDRESS']
 		keys = Response['keys']
@@ -174,7 +174,7 @@ class Message():
 		# we want content not response
 		if forward:
 			return make_response(r.content, r.status_code)
-		return r.content
+		return r.content, r.status_code
 
 
 	def PUT(self, address, path, data, forward):
@@ -189,7 +189,7 @@ class Message():
 
 		if forward:
 			return make_response(r.content, r.status_code)
-		return r.content
+		return r.content, r.status_code
 
 	def DELETE(self, address, path, query, forward):
 		
@@ -199,20 +199,31 @@ class Message():
 		
 		if forward:
 			return make_response(r.content, r.status_code)
-		return r.content
+		return r.content, r.status_code
 
 	def FORWARD(self, address, method, path, query, data):
 		
 		forward = False
 
 		if method == 'GET':
-			res = self.GET(address, path, query, forward)
+			res, status_code = self.GET(address, path, query, forward)
+			r_dict = json.loads(res.decode('utf-8'))
+			if "get-key" in r_dict:
+				r_dict["get-key"]["address"] = address
 
 		elif method == 'PUT':
-			res =  self.PUT(address, path, data, forward)
+			res, status_code =  self.PUT(address, path, data, forward)
+			r_dict = json.loads(res.decode('utf-8'))
+			if "insert-key" in r_dict:
+				r_dict["insert-key"]["address"] = address
+			elif "update-key" in r_dict:
+				r_dict["update-key"]["address"] = address
 
 		elif method == 'DELETE':
-			res = self.DELETE(address, path, query, forward)
+			res, status_code = self.DELETE(address, path, query, forward)
+			r_dict = json.loads(res.decode('utf-8'))
+			if "delete-key" in r_dict:
+				r_dict["delete-key"] = address
 
 		else:
 			return jsonify({
@@ -220,10 +231,7 @@ class Message():
 				'message'   : 'Error in exec_op'
 			}), 400
 
-		r_dict = json.loads(res.decode('utf-8'))
-		r_dict["address"] = address
-
-		return make_response(r_dict, 200)
+		return make_response(r_dict, status_code)
 
 # run the servers
 if __name__ == "__main__":
