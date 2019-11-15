@@ -1,0 +1,69 @@
+{
+    "successful-responses": {
+        "key-count": {
+            "message"  : "Key count retrieved successfully",
+            "key-count": 5
+        },
+
+        "view-change": {
+            "message": "View change successful",
+            "shards" : [
+                { "address": "10.10.0.2:13800", "key-count": 5 },
+                { "address": "10.10.0.3:13800", "key-count": 3 },
+                { "address": "10.10.0.4:13800", "key-count": 6 }
+            ]
+        },
+
+        "insert-key": {
+            "message" : "Added successfully",
+            "replaced": false,
+            "address" : "10.10.0.3:13800"
+        },
+
+        "update-key": {
+            "message" : "Updated successfully",
+            "replaced": true
+        },
+
+        "get-key": {
+            "message"  : "Retrieved successfully",
+            "doesExist": true,
+            "value"    : "sampleValue"
+        },
+
+        "delete-key": {
+            "message"  : "Deleted successfully",
+            "doesExist": true,
+            "address"  : "10.10.0.3:13800"
+        }
+
+    },
+    "failure-responses": {
+        "insert-key-missing": {
+            "message" : "Error in PUT",
+            "error"   : "Value is missing"
+        },
+
+        "insert-key-long": {
+            "message" : "Error in PUT",
+            "error"   : "Key is too long"
+        },
+
+        "update-key-missing": {
+            "message" : "Error in PUT",
+            "error"   : "Value is missing"
+        },
+
+        "get-key": {
+            "message"  : "Error in GET",
+            "error"    : "Key does not exist",
+            "doesExist": false
+        },
+
+        "delete-key": {
+            "message"  : "Error in DELETE",
+            "error"    : "Key does not exist",
+            "doesExist": false
+        }
+    }
+}

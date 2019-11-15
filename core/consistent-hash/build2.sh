@@ -11,6 +11,7 @@ addr3="10.10.0.4:13800"
 
 # convenience variables
 initial_full_view="${addr1},${addr2}"
+full_view=${initial_full_view},${addr3}
 
 docker run -p 13803:13800 \
 		--net=kv_subnet \

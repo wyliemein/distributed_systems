@@ -15,7 +15,11 @@ addr4="10.10.0.5:13800"
 addr5="10.10.0.6:13800"
 
 # convenience variables
+<<<<<<< HEAD
 initial_full_view="${addr1},${addr2},${addr3},${addr4},${addr5}"
+=======
+initial_full_view="${addr1}"
+>>>>>>> 932ffe45ae3311d7bd0d4c9f9edc598bc65813b8
 
 
 docker run --name="node1"        --net=kv_subnet     \
