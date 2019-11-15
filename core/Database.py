@@ -1,7 +1,7 @@
 from datetime import datetime
 from flask import jsonify
 
-class Database():
+class Node():
 
     def __init__(self):
         self.history = [("Initialized", datetime.now())]
