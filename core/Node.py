@@ -40,6 +40,31 @@ class Node():
         '''
         value = hash(key) % len(self.others)
         if (value == self.number):
+<<<<<<< HEAD
+=======
+            return True
+        return False
+
+    def reshard(self,_othersString):
+        self.others = _othersString.split(",")
+        # create a temporary list of dictionaries of payloads to send k/v's to proper nodes
+        forward_data = []
+        for ip in self.others:
+            forward_data.append((ip,{}))
+        temporary_keystore = {}
+        for key in self.keystore:
+            if (self.keyBelongsHere(key) != True):
+                newHashValue = self.hashKey(key)
+                forward_data[newHashValue][1][key] = self.keystore[key]
+            else:
+                temporary_keystore[key] = self.keystore[key]
+        self.keystore = temporary_keystore
+        # now iterate through forward_data
+        # print(forward_data, file=sys.stderr)
+        return forward_data
+        
+        if (value == self.number-1):
+>>>>>>> 5c91e08c0c335d31617ba324fbc5b8d81a74569d
             return True
         return False
 
@@ -198,4 +223,9 @@ class Node():
                 "doesExist"     : False,
                 "error"         : "Key does not exist",
                 "message"       : "Error in DELETE"
+<<<<<<< HEAD
             }), 404
+=======
+            }), 404
+
+>>>>>>> 5c91e08c0c335d31617ba324fbc5b8d81a74569d

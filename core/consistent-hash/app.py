@@ -40,10 +40,9 @@ def update_keys(keyName):
 	else:
 		path = '/kv-store/keys/'+keyName
 		method = request.method
-		forward = True
 		data = None
 
-		return router.FORWARD(key_shard, method, path, keyName, data, forward)
+		return router.FORWARD(key_shard, method, path, keyName, data)
 
 # get number of keys in system
 @app.route("/kv-store/key-count", methods=["GET"])
@@ -202,21 +201,29 @@ class Message():
 			return make_response(r.content, r.status_code)
 		return r.content
 
-	def FORWARD(self, address, method, path, query, data, forward):
+	def FORWARD(self, address, method, path, query, data):
+		
+		forward = False
+
 		if method == 'GET':
-			return self.GET(address, path, query, forward)
+			res = self.GET(address, path, query, forward)
 
 		elif method == 'PUT':
-			return self.PUT(address, path, data, forward)
+			res =  self.PUT(address, path, data, forward)
 
 		elif method == 'DELETE':
-			return self.DELETE(address, path, query, forward)
+			res = self.DELETE(address, path, query, forward)
 
 		else:
 			return jsonify({
 				'error'     : 'invalid requests method',
 				'message'   : 'Error in exec_op'
 			}), 400
+
+		r_dict = json.loads(res.decode('utf-8'))
+		r_dict["address"] = address
+
+		return make_response(r_dict, 200)
 
 # run the servers
 if __name__ == "__main__":
