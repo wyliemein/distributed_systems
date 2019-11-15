@@ -1,11 +1,12 @@
 from datetime import datetime
 from flask import jsonify
 
-class Database:
+class Database():
 
-    def __init__(self):
+    def __init__(self, address):
         self.history = [("Initialized", datetime.now())]
         self.keystore = {}
+        self.host = address
 
     """
         Functions below only read from the database
