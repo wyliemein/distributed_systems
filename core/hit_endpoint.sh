@@ -10,6 +10,7 @@ curl --request   PUT \
      --data      '{"value": "sampleValue"}' \
      http://127.0.0.1:13802/kv-store/keys/sampleKey
 
+<<<<<<< HEAD
 
 #curl --request GET \
 #	 --header 'Content-Type: application/json' \
@@ -21,3 +22,10 @@ curl --request   PUT \
 #     --data      '{"view":"10.10.0.2:13800,10.10.0.3:13800,10.10.0.4:13800"}' \
 #     --write-out "%{http_code}\n"                    \
 #     http://127.0.0.1:13802/kv-store/view-change
+=======
+curl --request GET \
+	 --header 'Content-Type: application/json' \
+	 --write-out '%{http_code}\n' \
+	 http://127.0.0.1:13802/kv-store/keys/sampleKey
+	 
+>>>>>>> 5c91e08c0c335d31617ba324fbc5b8d81a74569d

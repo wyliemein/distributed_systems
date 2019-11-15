@@ -33,4 +33,5 @@ curl --request PUT                                   \
 curl --request GET \
 	 --header 'Content-Type: application/json' \
 	 --write-out '%{http_code}\n' \
-	 http://127.0.0.1:13802/kv-store/key-count
+	 --data      '{"value": "sampleValue"}' \
+	 http://127.0.0.1:13804/kv-store/keys/sampleKey

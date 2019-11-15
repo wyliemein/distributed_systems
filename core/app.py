@@ -104,6 +104,7 @@ def new_view():
 	reshardResult = node.reshard(data["view"])
 	for result in reshardResult:
 		if (bool(result[1]) == True):
+<<<<<<< HEAD
 			forward = True
 			router.PUT(result[0],"/kv-store/view-change", {
 				"sender"	: node.IPAddress,
@@ -113,6 +114,36 @@ def new_view():
 	if ("keys" in data):
 		for key in data["keys"]:
 			node.insertKey(key, data["keys"][key], False)
+=======
+			forward(result[0],"/kv-store/view-change","PUT", {
+				"sender"	: node.IPAddress,
+				"view"		: data["view"],
+				"keys"		: result[1]
+			})
+	if ("keys" in data):
+		for key in data["keys"]:
+			node.insertKey(key, data["keys"][key], False)
+	return "Done", 200
+
+# forward 
+def forward(ADDRESS, path, op, keyName, internal):
+
+	ip_port = ADDRESS.split(":")
+	endpoint = 'http://' + ip_port[0] + ":" + ip_port[1] + path
+	headers = {'content-type': 'application/json', 'Accept-Charset': 'UTF-8'}
+			
+	# make recursive type call but to different ip
+	if method == "PUT":
+		r = requests.put(endpoint, json=data, headers=headers)
+		print("Put request made", file=sys.stderr)
+		return make_response(r.content, r.status_code)
+	elif method == "GET":
+		r = requests.get(endpoint, json=data, headers=headers)
+		return make_response(r.content, r.status_code)
+	elif method == "DELETE":
+		r = requests.delete(endpoint, json=data, headers=headers)
+		return make_response(r.content, r.status_code)
+>>>>>>> 5c91e08c0c335d31617ba324fbc5b8d81a74569d
 
 	return make_response("Done", 200)
 
@@ -179,6 +210,7 @@ class Message():
 			}), 400
 
 
+
 # run the servers
 if __name__ == "__main__":
 	# exract view and ip from environment
@@ -190,5 +222,8 @@ if __name__ == "__main__":
 	router = Message()
 
 	app.run(host='0.0.0.0', port=13800, debug=True, threaded=True)
+<<<<<<< HEAD
 
+=======
+>>>>>>> 5c91e08c0c335d31617ba324fbc5b8d81a74569d
 

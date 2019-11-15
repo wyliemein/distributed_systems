@@ -1,2 +1,6 @@
 Flask==0.12.2
+<<<<<<< HEAD
 requests
+=======
+requests
+>>>>>>> 5c91e08c0c335d31617ba324fbc5b8d81a74569d

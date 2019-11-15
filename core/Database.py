@@ -1,12 +1,11 @@
 from datetime import datetime
 from flask import jsonify
 
-class Database():
+class Node():
 
-    def __init__(self, address):
+    def __init__(self):
         self.history = [("Initialized", datetime.now())]
         self.keystore = {}
-        self.host = address
 
     """
         Functions below only read from the database
@@ -73,19 +72,17 @@ class Database():
             self.keystore[key] = value
             self.history.append(("Updated " + key + " to value " + value, datetime.now()))
             return jsonify({
-                "update-key"        : {
-                    "message"       : "Updated successfully",
-                    "replaced"      : True
-                }
+                "message"       : "Updated successfully",
+                "replaced"      : True,
+                "address"       : "TO DO",
             }), 201
         else:
             self.keystore[key] = value
             self.history.append(("Added " + key + " with value " + value, datetime.now()))
             return jsonify({
-                "insert-key"    : {
-                    "message"       : "Added successfully",
-                    "replaced"      : False
-                }
+                "message"       : "Added successfully",
+                "replaced"      : False,
+                "address"       : "TO DO",
             }), 201
 
     def removeKey(self, key):
@@ -97,18 +94,6 @@ class Database():
         if (self.containsKey(key)):
             del self.keystore[key]
             self.history.append(("Removed " + key, datetime.now()))
-            return jsonify({
-                "delete-key"    : {
-                    "message"  : "Deleted successfully",
-                    "doesExist": True
-                }
-            }), 201
+            return True
         else:
-            return jsonify({
-                "delete-key": {
-                    "message"  : "Error in DELETE",
-                    "error"    : "Key does not exist",
-                    "doesExist": false
-                }
-            }), 201
-
+            return False

@@ -1,12 +1,11 @@
 # ------------------------------
 # Run Docker containers
 
-path_to_dockerfile="This should be a dockerfile path"
 
 docker network create --subnet=10.10.0.0/16 kv_subnet
-docker build -t kv-store:3.0 $path_to_dockerfile
+docker build -t kv-store:3.0 .
 
-# example node addresses
+# example node addressess
 addr1="10.10.0.2:13800"
 addr2="10.10.0.3:13800"
 addr3="10.10.0.4:13800"
