@@ -8,19 +8,34 @@ IP address: 10.10.0.0/16
 Port numbers: 13800/16
 
 ### Key operations:
+To PUT, GET or DELETE a key from the system, send a request to the  
+endpoint.
+
 http path: http://IP:Port/kv-store/keys/<key>  
 supported methods: GET, PUT, DELETE  
 data: keyName, value (if PUT)  
 
-### Total key count:
+### GET key count for a node and the stored replicas:
+To get the total number of keys stored by a node, the shards it stores,  
+and the number of keys per shard, send a GET request to the endpoint.  
+
 http path: http://IP:Port/kv-store/key-count  
 supported methods: GET  
 
-### View change:
+### GET ID and key count for each shard:  
+http path: http://IP:Port/kv-store/shards  
+supported methods: GET  
+
+### GET information for a specific shard:  
+http path: http://IP:Port/kv-store/shards/<id>  
+supported methods: GET  
+data: shard ID
+
+### PUT request for view change:  
 A view change adds or removes storage nodes from the system.  This is   
 done by providing a view or list of ip:port pairs that represent nodes.  
 
-http path: http://IP:Port/kv-store/view-change  
+http path: http://IP:Port/kv-store/view-change   
 supported methods: PUT  
 data: new view  
 
