@@ -24,15 +24,14 @@ class Node(Database):
 		Database.__init__(self)
 
 		self.transfers = []
-		self.virtual_range = len(view) * replication_factor  # parameter for number of virtual nodes
+		self.virtual_range = 10 * replication_factor         # parameter for number of virtual nodes
 		self.ring_edge = 691 if len(view) < 100 else 4127    # parameter for hash mod value
+		self.num_shards = len(view) // replication_factorp
+		self.shard_interval = ring_edge // self.num_shards
 		self.ADDRESS = address
 		self.physical_nodes = view
-		self.membership_range = replication_factor
-
 		self.VIEW = []
 		self.virtual_translation = {}       
-		self.distribution = {ip:0 for ip in self.physical_nodes} 
 		self.router = router
 		self.initial_view(view)
 
@@ -79,6 +78,15 @@ class Node(Database):
 
 		# we want to store ring values in sorted list
 		self.VIEW.sort()
+
+	'''
+	determine what shard this node is in
+	defined as: see where ring index / virtual range lands
+	'''
+	def shard_memebership(self, ring_val):
+		node_num = self.VIEW.index(ring_val)
+		shard = node_num // self.shard_interval
+		return shard
 
 	'''
 	given node address, hash and create virtual nodes
