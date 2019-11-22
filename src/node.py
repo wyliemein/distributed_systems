@@ -22,13 +22,14 @@ class Node(Database):
 	'''docstring for node class'''
 	def __init__(self, router, address, view, replication_factor):
 		Database.__init__(self)
-
+		#self.history = [("Initialized", datetime.now())]
 		self.transfers = []
 		self.virtual_range = 10 * replication_factor         # parameter for number of virtual nodes
 		self.ring_edge = 691 if len(view) < 100 else 4127    # parameter for hash mod value
 		self.num_shards = len(view) // replication_factorp
 		self.shard_interval = ring_edge // self.num_shards
 		self.ADDRESS = address
+		self.shard_num = -1
 		self.physical_nodes = view
 		self.VIEW = []
 		self.virtual_translation = {}       
@@ -83,10 +84,20 @@ class Node(Database):
 	determine what shard this node is in
 	defined as: see where ring index / virtual range lands
 	'''
-	def shard_memebership(self, ring_val):
+	def shard_ID(self, ring_val):
 		node_num = self.VIEW.index(ring_val)
 		shard = node_num // self.shard_interval
 		return shard
+
+	'''
+	get all nodes in this shard, return list of ring values
+	'''
+	def shard_members(self, shard_ID):
+		lower_bound = self.shard_interval * shard_ID # since shard_ID starts at 0
+		upper_bound = self.shard_interval * (shard_ID * 1)
+
+		shard_members = self.VIEW[lower_bound:upper_bound]
+		return shard_members
 
 	'''
 	given node address, hash and create virtual nodes
