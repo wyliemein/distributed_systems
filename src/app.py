@@ -13,7 +13,8 @@ app = Flask(__name__)
 
 @app.route("/")
 def root():
-	return "Home: CS 138: Assignment 4"
+	return '''<Home>: |\n
+					  | CS 138: Assignment 4'''
 
 '''
 get the current state of this node

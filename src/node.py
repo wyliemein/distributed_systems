@@ -1,14 +1,6 @@
 '''
-partitioning algorithm implementing consistent hashing with virtual nodes
-
-procedure
-1. hash nodes by IP address
-2. hash 'data' by key
-
-each data packet corresponds to a node on a unit circle of integers
-ownership of data is defined as:
-	the predecessor on the circle
-	the data between two nodes on the circle
+Partitioning algorithm implementing consistent hashing, virtual nodes
+and shard membership.
 '''
 
 import xxhash as hasher
@@ -22,22 +14,26 @@ class Node(Database):
 	'''docstring for node class'''
 	def __init__(self, router, address, view, replication_factor):
 		Database.__init__(self)
-		#self.history = [("Initialized", datetime.now())]
+		self.history = [("Initialized", datetime.now())]
 		self.transfers = []
-		self.virtual_range = 10 * replication_factor         # parameter for number of virtual nodes
-		self.ring_edge = 691 if len(view) < 100 else 4127    # parameter for hash mod value
-		self.num_shards = len(view) // replication_factorp
-		self.shard_interval = ring_edge // self.num_shards
 		self.ADDRESS = address
-		self.shard_num = -1
-		self.physical_nodes = view
-		self.VIEW = []
-		self.virtual_translation = {}       
+
+		self.ring_edge = 691 if len(view) < 100 else 4127    # parameter for hash mod value
+		self.repl_factor = replication_factor
+		self.num_shards = len(view) // replication_factor
+		self.virtual_range = 10 * self.num_shards         
+		self.shard_interval = self.ring_edge // self.virtual_range
+		self.nodes = view
+
+		self.V_SHARDS = [] # store all virtual shards
+		self.P_SHARDS = [[] for i in range(num_shards)] # map physical shards to nodes
+
+		self.shard_ID = -1      
 		self.router = router
 		self.initial_view(view)
 
 	def __repr__(self):
-		return {'ADDRESS':self.ADDRESS, 'VIEW':self.physical_nodes, 'KEYS':len(self.keystore), 'VIRTUAL_NODES':self.virtual_translation}
+		return {'ADDRESS':self.ADDRESS, 'VIEW':self.nodes, 'KEYS':len(self.keystore), 'VIRTUAL_SHARDS':self.P_SHARDS}
 
 	'''
 	give a state report 
@@ -66,64 +62,68 @@ class Node(Database):
 		return (hash_val % self.ring_edge) 
 
 	'''
-	construct initial view given ip/port pairs
-	use concept of virtual nodes
-	must handle collisions
+	construct virtual shards and map them to physical shards
+	once mapping is done, sort
 	'''
-	def initial_view(self, view):
-
-		# insert ip addresses into dict
-		for ip_port in view:
-			
-			self.add_node(ip_port)
-
-		# we want to store ring values in sorted list
-		self.VIEW.sort()
-
-	'''
-	determine what shard this node is in
-	defined as: see where ring index / virtual range lands
-	'''
-	def shard_ID(self, ring_val):
-		node_num = self.VIEW.index(ring_val)
-		shard = node_num // self.shard_interval
-		return shard
-
-	'''
-	get all nodes in this shard, return list of ring values
-	'''
-	def shard_members(self, shard_ID):
-		lower_bound = self.shard_interval * shard_ID # since shard_ID starts at 0
-		upper_bound = self.shard_interval * (shard_ID * 1)
-
-		shard_members = self.VIEW[lower_bound:upper_bound]
-		return shard_members
-
-	'''
-	given node address, hash and create virtual nodes
-	after this method is called, self.VIEW should be sorted
-	'''
-	def add_node(self, ADDRESS):
-
-		if ADDRESS not in self.physical_nodes:
-			self.physical_nodes.append(ADDRESS)
-
-		new_nodes = []
+	def initial_sharding(self):
 		for v_num in range(self.virtual_range):
 
-			virtural_node = ADDRESS + str(v_num)
-			ring_num = self.hash(virtural_node) # unique value on 'ring'
+			virtural_shard = ADDRESS + str(v_num)
+			ring_num = self.hash(virtural_shard) # unique value on 'ring'
 
 			# if ring_num is already in unsorted list, skip this iteration
 			if ring_num in self.VIEW:
 				print('System: Hash collision detected')
 				continue
 
-			self.VIEW.append(ring_num)
-			self.virtual_translation[ring_num] = ADDRESS
-			new_nodes.append(ring_num)
+			self.V_SHARDS.append(ring_num)
 
-		return new_nodes
+		# we want to keep these in sorted order for ring ownership
+		self.V_SHARDS.sort()
+
+		self.init_shard_population()
+
+	'''
+	We want to evenly add replica nodes to shards, ie each shard gets
+	repl_factor number of shards
+	'''
+	def init_shard_population(self):
+		nodes = []
+		for ip_port in self.nodes:
+			node_num = self.hash(ip_port)
+			nodes.append(node_num)
+
+		nodes.sort()
+
+		g_iter = 0
+		shard_num = 0
+		while g_iter < len(nodes):
+			if g_iter % self.repl_factor == 0:
+				shard_num += 1
+
+			self.P_SHARDS[shard_num].append(nodes[g_iter])
+
+	'''
+	Add a single node to shards, must decide which shard to add to.
+	If len(nodes) + 1 // r > shard_num, we need to add a shard perform a re-shard
+	'''
+	def add_node(self, node):
+ 		if ((len(self.nodes) + 1) // self.repl_factor) > self.num_shards:
+ 			# must perform a shard shuffling 
+
+		else:
+			ring_val = self.hash(node)
+			shard_ID = self.shard_ID(ring_val)
+			self.P_SHARDS[shard_ID].append(node)
+
+	'''
+	determine what physical shard this node is in
+	defined as: see where ring index / virtual range lands
+	'''
+	def shard_ID(self, ring_val):
+		node_num = self.V_SHARDS.index(ring_val)
+		shard = node_num // self.shard_interval
+		return shard
 
 	'''
 	Perform a key operation, ie find the correct node given key
@@ -135,12 +135,12 @@ class Node(Database):
 		ring_val = self.hash(key)
 
 		# get the virtual ring number
-		node_ring_val = self.find_node('predecessor', ring_val)
+		v_shard = self.find_shard('predecessor', ring_val)
 
 		# convert to physical node ip
-		ip_port = self.virtual_translation[node_ring_val]
+		shard_ID = self.P_SHARDS[node_ring_val]
 
-		return ip_port
+		return shard_ID
 
 	'''
 	insert a new key, send it to all nodes in shard
@@ -162,28 +162,28 @@ class Node(Database):
 		pass
 
 	'''
-	perform binary search on VIEW given ring value
+	perform binary search on list of virtual shards given ring value
 	we need to be careful about wrap around case. If ring_val >= max_ring_val, return 0
 	'''
-	def find_node(self, direction, ring_val):
+	def find_shard(self, direction, ring_val):
 
 		if direction == 'predecessor':
-			node_num = bisect_left(self.VIEW, ring_val)
-			if node_num:
-				return self.VIEW[node_num-1]
-			return self.VIEW[-1]
+			v_shard = bisect_left(self.V_SHARDS, ring_val)
+			if v_shard:
+				return self.V_SHARDS[v_shard-1]
+			return self.V_SHARDS[-1]
 
 		elif direction == 'successor':
-			node_num = bisect_right(self.VIEW, ring_val)
-			if node_num != len(self.VIEW):
-				return self.VIEW[node_num]
-			return self.VIEW[0]
+			v_shard = bisect_right(self.V_SHARDS, ring_val)
+			if v_shard != len(self.V_SHARDS):
+				return self.V_SHARDS[v_shard]
+			return self.V_SHARDS[0]
 
 	'''
 	return all physical nodes
 	'''
-	def all_nodes(self):
-		return self.physical_nodes
+	def all_shards(self):
+		return self.P_SHARDS
 
 	'''
 	respond to view change request, perform a reshard
@@ -225,7 +225,7 @@ class Node(Database):
 				successor = self.find_node('successor', v)
 				predecessor = self.find_node('predecessor', v)
 
-				if self.virtual_translation[predecessor] == self.ADDRESS:
+				if self.P_SHARDS[predecessor] == self.ADDRESS:
 					# this instance contains keys that need to be re-distributed
 					address = self.transfer(predecessor, v, successor) # we now have the keys to swap
 		
@@ -249,7 +249,7 @@ class Node(Database):
 				
 				# transfer key-val to new node 
 				# once transfered, delete from predecessor
-				address = self.virtual_translation[new_node]
+				address = self.P_SHARDS[new_node]
 				path = '/kv-store/internal/keys/' + key
 				data = json.dumps({'value':self.keystore[key]})
 				forward = False
