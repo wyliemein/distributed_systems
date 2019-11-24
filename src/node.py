@@ -5,32 +5,32 @@ and shard membership.
 
 import xxhash as hasher
 from bisect import bisect_right, bisect_left
-from storage_host import Database 
+from storage_host import KV_store
 from datetime import datetime
 import json
+from collections import OrderedDict
 
 
 class Node(Database):
 	'''docstring for node class'''
 	def __init__(self, router, address, view, replication_factor):
-		Database.__init__(self)
+		KV_store.__init__(self)
 		self.history = [("Initialized", datetime.now())]
 		self.transfers = []
-		self.ADDRESS = address
 
+		self.ADDRESS = address
 		self.ring_edge = 691 if len(view) < 100 else 4127    # parameter for hash mod value
 		self.repl_factor = replication_factor
 		self.num_shards = len(view) // replication_factor
-		self.virtual_range = 10 * self.num_shards         
+		self.virtual_range = 20        
 		self.shard_interval = self.ring_edge // self.virtual_range
 		self.nodes = view
 
-		self.V_SHARDS = [] # store all virtual shards
-		self.P_SHARDS = [[] for i in range(num_shards)] # map physical shards to nodes
-
-		self.shard_ID = -1      
+		self.V_SHARDS = OrderedDict() # store all virtual shards
+		self.P_SHARDS = [[] for i in range(self.num_shards)] # map physical shards to nodes
+   
 		self.router = router
-		self.initial_view(view)
+		self.initial_sharding()
 
 	def __repr__(self):
 		return {'ADDRESS':self.ADDRESS, 'VIEW':self.nodes, 'KEYS':len(self.keystore), 'VIRTUAL_SHARDS':self.P_SHARDS}
@@ -42,15 +42,34 @@ class Node(Database):
 	def state_report(self):
 		state = self.__repr__()
 
-		state['TRANSFERS'] = {}
+		state['HISTORY'] = {}
 		string = 'node'
 		itr = 1
-		for event in self.transfers:
+		for event in self.history:
 			key = string + str(itr)
 			itr += 1
-			state['TRANSFERS'][key] = event
+			state['HISTORY'][key] = event
 
 		return state
+
+	'''
+	Below are all key operations, these functions are used as a wraper for 
+	the key-value store to evaluate causal objects before actually writing
+	'''
+	def insert_key(self, key, value):
+		pass
+
+	def read_key(self, key):
+		pass
+
+	def delete_key(self, key):
+		pass
+
+	'''
+	parse the causal object to determine ordering
+	'''
+	def parse_causal_object(self, response):
+		pass
 
 	'''
 	hash frunction is a composit of xxhash modded by prime
@@ -66,28 +85,26 @@ class Node(Database):
 	once mapping is done, sort
 	'''
 	def initial_sharding(self):
-		for v_num in range(self.virtual_range):
+		for p_shard in range(self.num_shards) 
+			for v_shard in range(self.virtual_range):
 
-			virtural_shard = ADDRESS + str(v_num)
-			ring_num = self.hash(virtural_shard) # unique value on 'ring'
+				virtural_shard = str(p_shard) + str(v_shard)
+				ring_num = self.hash(virtural_shard) # unique value on 'ring'
 
-			# if ring_num is already in unsorted list, skip this iteration
-			if ring_num in self.VIEW:
-				print('System: Hash collision detected')
-				continue
+				# if ring_num is already in unsorted list, skip this iteration
+				if ring_num in self.V_SHARDS:
+					print('System: Hash collision detected')
+					continue
 
-			self.V_SHARDS.append(ring_num)
+				self.V_SHARDS[virtural_shard] = p_shard
 
-		# we want to keep these in sorted order for ring ownership
-		self.V_SHARDS.sort()
-
-		self.init_shard_population()
+		self.init_node_assignment()
 
 	'''
 	We want to evenly add replica nodes to shards, ie each shard gets
 	repl_factor number of shards
 	'''
-	def init_shard_population(self):
+	def init_node_assignment(self):
 		nodes = []
 		for ip_port in self.nodes:
 			node_num = self.hash(ip_port)
@@ -108,13 +125,20 @@ class Node(Database):
 	If len(nodes) + 1 // r > shard_num, we need to add a shard perform a re-shard
 	'''
 	def add_node(self, node):
- 		if ((len(self.nodes) + 1) // self.repl_factor) > self.num_shards:
- 			# must perform a shard shuffling 
+		if ((len(self.nodes) + 1) // self.repl_factor) > self.num_shards:
+			# must perform a shard shuffling 
+			pass
 
 		else:
 			ring_val = self.hash(node)
 			shard_ID = self.shard_ID(ring_val)
 			self.P_SHARDS[shard_ID].append(node)
+
+	'''
+	remove single node from a shard, determine if we need to re-shuffle shards
+	'''
+	def remove_node(self, node):
+		pass
 
 	'''
 	determine what physical shard this node is in
@@ -126,8 +150,8 @@ class Node(Database):
 		return shard
 
 	'''
-	Perform a key operation, ie find the correct node given key
-	First hash the key then perform binary search to find the correct node
+	Perform a key operation, ie find the correct shard given key.
+	First hash the key then perform binary search to find the correct shard
 	to store the key. 
 	'''
 	def find_match(self, key):
@@ -141,25 +165,6 @@ class Node(Database):
 		shard_ID = self.P_SHARDS[node_ring_val]
 
 		return shard_ID
-
-	'''
-	insert a new key, send it to all nodes in shard
-	this lays ontop of storage_host.insertKey
-	'''
-	def insert_key(self, key, value):
-		pass
-
-	'''
-	get a key and make sure its the latest version
-	'''
-	def read_key(self, key):
-		pass
-
-	'''
-	delete a key from all nodes in shard
-	'''
-	def delete_key(self, key):
-		pass
 
 	'''
 	perform binary search on list of virtual shards given ring value
@@ -180,7 +185,7 @@ class Node(Database):
 			return self.V_SHARDS[0]
 
 	'''
-	return all physical nodes
+	return all physical shards
 	'''
 	def all_shards(self):
 		return self.P_SHARDS
@@ -190,86 +195,21 @@ class Node(Database):
 	this can only be done if all nodes have been given new view
 	'''
 	def view_change(self, new_view):
-
-		add_nodes = list(set(new_view) - set(self.physical_nodes))
-		remove_nodes = list(set(self.physical_nodes) - set(new_view))
-
-		# add nodes to ring
-		for shard in add_nodes:
-			add = True
-			self.reshard(add, shard)
-
-		# remove nodes from ring
-		for shard in remove_nodes:
-
-			add = False
-			self.reshard(add, shard)
-
-		return self.ADDRESS, self.numberOfKeys()
+		pass
 
 	'''
 	Perform a reshard, re-distribute minimun number of keys
 	Transfer all keys between new node and successor that should
 	belong to new node
 	'''
-	def reshard(self, adding, node):
-		# we are adding
-		if adding:
-
-			# hash new node and create virtual nodes
-			new_virtual_nodes = self.add_node(node)
-
-			for v in new_virtual_nodes:
-
-				# find next node on ring and previous node on ring
-				successor = self.find_node('successor', v)
-				predecessor = self.find_node('predecessor', v)
-
-				if self.P_SHARDS[predecessor] == self.ADDRESS:
-					# this instance contains keys that need to be re-distributed
-					address = self.transfer(predecessor, v, successor) # we now have the keys to swap
-		
-		# we are removing nodes 
-		else:
-			pass
+	def reshard(self, type, node):
+		pass
 
 	'''
-	this instance must be the predecessor of the new v-node
-	now need to transfer keys from predecessor to new v-node
+	transfer keys from this node to other nodes, must be an atomic operation
 	'''
 	def transfer(self, predecessor, new_node, successor):
-
-		for key in list(self.keystore):
-			ring_val = self.hash(key)
-
-			# look for ring ring value between predecessor and successor
-			correct_predecessor = (ring_val > predecessor) or (predecessor == self.VIEW[-1])
-
-			if correct_predecessor and (ring_val < successor):
-				
-				# transfer key-val to new node 
-				# once transfered, delete from predecessor
-				address = self.P_SHARDS[new_node]
-				path = '/kv-store/internal/keys/' + key
-				data = json.dumps({'value':self.keystore[key]})
-				forward = False
-
-				content, status = self.router.PUT(address, path, data, forward)
-
-				# we were successful in transfering the key
-				if status == 201:
-
-					msg = str(self.keystore[key]) + " transfered: from " + self.ADDRESS + " to " + address + "\n"
-
-					self.transfers.append(msg)
-
-					del self.keystore[key]
-
-				else:
-					# error occured
-					raise Exception ("non 201 status_code in transfer", res)
-
-		return new_node
+		pass
 
 
 

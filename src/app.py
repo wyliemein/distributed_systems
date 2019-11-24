@@ -14,7 +14,7 @@ app = Flask(__name__)
 @app.route("/")
 def root():
 	return '''<Home>: |\n
-					  | CS 138: Assignment 4'''
+					  | CS 138: Assignment 4\n'''
 
 '''
 get the current state of this node
@@ -27,32 +27,6 @@ def state():
 	
 	return jsonify({
 				"node state:"     : json_state
-	}), 200
-
-'''
-total system reset, wipe all local databases: only used in dubugging mode
-'''
-@app.route("/kv-store/system/reset", methods=["DELETE"])
-def total_reset():
-	data = request.get_json()
-	forward = data.get('forward')
-
-	if forward == "true":
-		all_nodes = shard.all_nodes()
-
-		for node in all_nodes:
-			if node == shard.ADDRESS:
-				continue
-			
-			path = '/kv-store/system/reset'
-			forward = False
-			data = json.dumps({"forward":"false"})
-			router.DELETE(node, path, data, forward)
-
-	shard.keystore = {}
-
-	return jsonify({
-				"System:"     : "all keys deleted"
 	}), 200
 
 '''
@@ -184,7 +158,7 @@ def spread_view():
 	}), 200
 
 '''
-perfrom operation on node's local database
+perfrom operation on node's local key-store
 '''
 def local_operation(method, keyName):
 	
@@ -293,12 +267,13 @@ if __name__ == "__main__":
 
 	# exract view and ip
 	VIEW_STR = os.environ["VIEW"]
-	views = VIEW_STR.split(",")
+	VIEW = VIEW_STR.split(",")
 	ADDRESS = os.environ["ADDRESS"]
+	REPL_FACTOR = int(os.environ["REPL_FACTOR"])
 
-	# create initial shard for this node, hash this shard
+	# create node and message router
 	router = Message()
-	shard = Node(router, ADDRESS, views)
+	shard = Node(router, ADDRESS, VIEW, REPL_FACTOR)
 
 	app.run(host='0.0.0.0', port=13800, debug=True)
 
