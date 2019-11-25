@@ -1,11 +1,8 @@
 from datetime import datetime
 from flask import jsonify
 
-<<<<<<< HEAD
-=======
 import sys
 
->>>>>>> 932ffe45ae3311d7bd0d4c9f9edc598bc65813b8
 class Node():
 
     def __init__(self):
@@ -19,11 +16,7 @@ class Node():
     def setInfo(self,_IPAddress, _others):
         splitIP = _IPAddress.split(":")[0]
         self.port = 13800 + int((splitIP.split(".")[3]))
-<<<<<<< HEAD
-        self.number = int((splitIP.split(".")[3])) - 1
-=======
         self.number = int((splitIP.split(".")[3])) - 2
->>>>>>> 932ffe45ae3311d7bd0d4c9f9edc598bc65813b8
         self.IPAddress = _IPAddress
         self.others = _others
 
@@ -35,12 +28,6 @@ class Node():
     """
 
     def hashKey(self,key):
-<<<<<<< HEAD
-        value = hash(key)
-        return value % len(self.others)
-
-
-=======
         '''
         Returns the hash value modded by the number of others
         '''
@@ -53,8 +40,6 @@ class Node():
         '''
         value = hash(key) % len(self.others)
         if (value == self.number):
-<<<<<<< HEAD
-=======
             return True
         return False
 
@@ -72,49 +57,14 @@ class Node():
             else:
                 temporary_keystore[key] = self.keystore[key]
         self.keystore = temporary_keystore
-        # now iterate through forward_data
-        # print(forward_data, file=sys.stderr)
         return forward_data
         
-        if (value == self.number-1):
->>>>>>> 5c91e08c0c335d31617ba324fbc5b8d81a74569d
-            return True
-        return False
-
-    def all_nodes(self):
-        # return all nodes in our current view
-        return self.others
-
-    def reshard(self,_othersString):
-        self.others = _othersString.split(",")
-        # create a temporary list of dictionaries of payloads to send k/v's to proper nodes
-        forward_data = []
-        for ip in self.others:
-            forward_data.append((ip,{}))
-        temporary_keystore = {}
-        for key in self.keystore:
-            if (self.keyBelongsHere(key) != True):
-                newHashValue = self.hashKey(key)
-                forward_data[newHashValue][1][key] = self.keystore[key]
-            else:
-                temporary_keystore[key] = self.keystore[key]
-        self.keystore = temporary_keystore
-        # now iterate through forward_data
-        # print(forward_data, file=sys.stderr)
-        return forward_data
-        
->>>>>>> 932ffe45ae3311d7bd0d4c9f9edc598bc65813b8
     def containsKey(self, key):
         '''
         Returns the True if the key is contained in the local database
         '''
         return (key in self.keystore)
 
-<<<<<<< HEAD
-    def readKey(self, key):
-        if (self.containsKey):
-            return jsonify({
-=======
     def readKey(self, key, forward):
         if (self.containsKey):
             if (forward == True):
@@ -126,7 +76,6 @@ class Node():
             }), 200
             else:
                 return jsonify({
->>>>>>> 932ffe45ae3311d7bd0d4c9f9edc598bc65813b8
                 "doesExist"     : True,
                 "message"       : "Retrieved successfully",
                 "value"         : self.keystore[key]
@@ -163,14 +112,9 @@ class Node():
     def returnAllKeysWithHash(self):
         output = "<br><center>"
         for key in self.keystore:
-<<<<<<< HEAD
-            output = output + "<b>" + key + ": " + self.keystore[key] + " -> Node " + str(self.hashKey(key) + 1) + "@ IP" + self.others[self.hashKey(key)] + "<br>"
-        return output + "</center>"
-=======
             output = output + "<b>" + key + ": " + self.keystore[key] + "<br>"
         return output + "</center>"
 
->>>>>>> 932ffe45ae3311d7bd0d4c9f9edc598bc65813b8
     """
         Functions below perform writes to the database
         
@@ -197,65 +141,43 @@ class Node():
         elif (self.containsKey(key)):
             self.keystore[key] = value
             self.history.append(("Updated " + key + " to value " + value, datetime.now()))
-            return jsonify({
+            if (forward == True):
+                return jsonify({
+                    "message"       : "Updated successfully",
+                    "replaced"      : True,
+                    "address"       : self.IPAddress
+                }), 201
+            else:
+                return jsonify({
                 "message"       : "Updated successfully",
-                "replaced"      : True,
-                "address"       : "TO DO",
+                "replaced"      : True
             }), 201
+            
         else:
             replaced = True if self.containsKey(key) else False
             message = "Updated Successfully" if replaced else "Added successfully"
-<<<<<<< HEAD
-            self.history.append((("Updated " if replaced else "Added") + key + " to value " + value, datetime.now()))
-=======
->>>>>>> 932ffe45ae3311d7bd0d4c9f9edc598bc65813b8
             if (forward == True):
                 self.keystore[key] = value
                 self.history.append(("Added " + key + " with value " + value, datetime.now()))
                 return jsonify({
                     "message"       : message,
                     "replaced"      : replaced,
-<<<<<<< HEAD
-=======
                     "address"       : self.IPAddress,
->>>>>>> 932ffe45ae3311d7bd0d4c9f9edc598bc65813b8
                 }), 201
             else:
                 self.keystore[key] = value
                 self.history.append(("Added " + key + " with value " + value, datetime.now()))
                 return jsonify({
-<<<<<<< HEAD
-                    "message"       : "Added successfully",
-                    "replaced"      : replaced,
-                    "address"       : self.IPAddress,
-                }), 201
-
-    def forwardKey(key, value):
-        # TODO right here forward the key
-        return 
-    
-
-    def removeKey(self, key):
-=======
                     "message"       : message,
                     "replaced"      : replaced,
                 }), 201
 
     def removeKey(self, key, forward):
->>>>>>> 932ffe45ae3311d7bd0d4c9f9edc598bc65813b8
         '''
         Checks whether the key is found and removes it
             : returns true if it is found and removed
             : returns false if the key is not found
         '''
-<<<<<<< HEAD
-        if (self.containsKey(key)):
-            del self.keystore[key]
-            self.history.append(("Removed " + key, datetime.now()))
-            return True
-        else:
-            return False
-=======
         if (self.containsKey):
             if (forward == True):
                 del self.keystore[key]
@@ -277,10 +199,4 @@ class Node():
                 "doesExist"     : False,
                 "error"         : "Key does not exist",
                 "message"       : "Error in DELETE"
-<<<<<<< HEAD
             }), 404
-=======
-            }), 404
-
->>>>>>> 5c91e08c0c335d31617ba324fbc5b8d81a74569d
->>>>>>> 932ffe45ae3311d7bd0d4c9f9edc598bc65813b8
