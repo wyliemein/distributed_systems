@@ -22,17 +22,16 @@ class Node(KV_store):
 		self.ring_edge = 691 if len(view) < 100 else 4127    # parameter for hash mod value
 		self.repl_factor = replication_factor
 		self.num_shards = len(view) // replication_factor
-		self.virtual_range = 20        
+		self.virtual_range = 4        
 		self.shard_interval = self.ring_edge // self.virtual_range
-		self.nodes = view
 		self.V_SHARDS = OrderedDict() # store all virtual shards
 		self.P_SHARDS = [[] for i in range(0, self.num_shards)] # map physical shards to nodes
    
 		self.router = router
-		self.initial_sharding()
+		self.initial_sharding(view)
 
 	def __repr__(self):
-		return {'ADDRESS':self.ADDRESS, 'VIEW':self.nodes, 'KEYS':len(self.keystore), 'VIRTUAL_SHARDS':self.P_SHARDS}
+		return {'ADDRESS':self.ADDRESS, 'V_SHARDS':self.V_SHARDS, 'P_SHARDS':self.P_SHARDS, 'KEYS':len(self.keystore)}
 
 	'''
 	give a state report 
@@ -71,9 +70,9 @@ class Node(KV_store):
 		pass
 
 	'''
-	define a gossip protocol to ensure eventual consistency
+	define a gossip protocol to ensure eventual consistency among nodes in shard
 	'''
-	def gossip(self):
+	def anti_entropy(self):
 		pass
 
 	'''
@@ -89,7 +88,7 @@ class Node(KV_store):
 	construct virtual shards and map them to physical shards
 	once mapping is done, sort
 	'''
-	def initial_sharding(self):
+	def initial_sharding(self, view):
 		for p_shard in range(self.num_shards): 
 			for v_shard in range(self.virtual_range):
 
@@ -101,21 +100,23 @@ class Node(KV_store):
 					print('System: Hash collision detected')
 					continue
 
-				self.V_SHARDS[virtural_shard] = p_shard
+				self.V_SHARDS[ring_num] = p_shard
 
-		self.init_node_assignment()
+		self.V_SHARDS = (sorted(self.V_SHARDS.items()))
+		self.init_node_assignment(view)
 
 	'''
 	We want to evenly add replica nodes to shards, ie each shard gets
 	repl_factor number of shards
 	'''
-	def init_node_assignment(self):
-		nodes = []
-		for ip_port in self.nodes:
+	def init_node_assignment(self, view):
+		nodes = {}
+		for ip_port in view:
 			node_num = self.hash(ip_port)
-			nodes.append(node_num)
+			nodes[node_num] = ip_port
 
-		nodes.sort()
+		nodes = OrderedDict(sorted(nodes.items()))
+		vals = list(nodes.values())
 
 		node_iter = 0
 		shard_num = 0
@@ -123,7 +124,7 @@ class Node(KV_store):
 			if node_iter % self.repl_factor == 0 and node_iter != 0:
 				shard_num += 1
 
-			self.P_SHARDS[shard_num].append(nodes[node_iter])
+			self.P_SHARDS[shard_num].append(vals[node_iter])
 			node_iter += 1
 
 	'''
