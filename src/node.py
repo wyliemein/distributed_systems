@@ -8,7 +8,6 @@ from bisect import bisect_right, bisect_left
 from storage_host import KV_store
 from datetime import datetime
 import json
-from collections import OrderedDict
 
 
 class Node(KV_store):
@@ -22,10 +21,12 @@ class Node(KV_store):
 		self.ring_edge = 691 if len(view) < 100 else 4127    # parameter for hash mod value
 		self.repl_factor = replication_factor
 		self.num_shards = len(view) // replication_factor
-		self.virtual_range = 4        
+		self.virtual_range = 2        
 		self.shard_interval = self.ring_edge // self.virtual_range
-		self.V_SHARDS = OrderedDict() # store all virtual shards
+		self.nodes = view
+		self.V_SHARDS = [] # store all virtual shards
 		self.P_SHARDS = [[] for i in range(0, self.num_shards)] # map physical shards to nodes
+		self.virtual_translation = {}
    
 		self.router = router
 		self.initial_sharding(view)
@@ -100,9 +101,10 @@ class Node(KV_store):
 					print('System: Hash collision detected')
 					continue
 
-				self.V_SHARDS[ring_num] = p_shard
+				self.V_SHARDS.append(ring_num)
+				self.virtual_translation[ring_num] = p_shard
 
-		self.V_SHARDS = (sorted(self.V_SHARDS.items()))
+		self.V_SHARDS.sort()
 		self.init_node_assignment(view)
 
 	'''
@@ -138,7 +140,7 @@ class Node(KV_store):
 
 		else:
 			ring_val = self.hash(node)
-			shard_ID = self.shard_ID(ring_val)
+			shard_ID = self.find_match(ring_val)
 			self.P_SHARDS[shard_ID].append(node)
 
 	'''
@@ -146,15 +148,6 @@ class Node(KV_store):
 	'''
 	def remove_node(self, node):
 		pass
-
-	'''
-	determine what physical shard this node is in
-	defined as: see where ring index / virtual range lands
-	'''
-	def shard_ID(self, ring_val):
-		node_num = self.V_SHARDS.index(ring_val)
-		shard = node_num // self.shard_interval
-		return shard
 
 	'''
 	Perform a key operation, ie find the correct shard given key.
@@ -165,11 +158,11 @@ class Node(KV_store):
 		
 		ring_val = self.hash(key)
 
-		# get the virtual ring number
+		# get the virtual shard number
 		v_shard = self.find_shard('predecessor', ring_val)
 
-		# convert to physical node ip
-		shard_ID = self.P_SHARDS[node_ring_val]
+		# convert to physical shard
+		shard_ID = self.virtual_translation[v_shard]
 
 		return shard_ID
 

@@ -10,6 +10,7 @@ class Test_Shard_Methods(unittest.TestCase):
 	addr2="10.10.0.3:13800"
 	addr3="10.10.0.4:13800"
 	addr4="10.10.0.5:13800"
+	addr5="10.10.0.6:13800"
 
 	# instanciate node class
 	view = [addr1, addr2, addr3, addr4]
@@ -27,7 +28,15 @@ class Test_Shard_Methods(unittest.TestCase):
 		self.assertTrue(len(self.shard.V_SHARDS)>0)
 
 	def test_add_node(self):
-		pass
+		old_card = len(self.shard.P_SHARDS[0])
+		self.shard.add_node(self.addr5)	
+
+		new_card = 0
+		for shard in self.shard.P_SHARDS:
+			if len(shard) > new_card:
+				new_card = len(shard)
+
+		self.assertTrue(new_card > old_card)
 
 	def test_find_match(self):
 		pass

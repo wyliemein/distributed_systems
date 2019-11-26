@@ -22,8 +22,9 @@ class Node(KV_store):
 		self.ring_edge = 691 if len(view) < 100 else 4127    # parameter for hash mod value
 		self.repl_factor = replication_factor
 		self.num_shards = len(view) // replication_factor
-		self.virtual_range = 4        
+		self.virtual_range = 2        
 		self.shard_interval = self.ring_edge // self.virtual_range
+		self.nodes = view
 		self.V_SHARDS = OrderedDict() # store all virtual shards
 		self.P_SHARDS = [[] for i in range(0, self.num_shards)] # map physical shards to nodes
    
