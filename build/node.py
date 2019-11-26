@@ -11,7 +11,7 @@ import json
 from collections import OrderedDict
 
 
-class Node(KV_store):
+class Node(Database):
 	'''docstring for node class'''
 	def __init__(self, router, address, view, replication_factor):
 		KV_store.__init__(self)
@@ -25,8 +25,9 @@ class Node(KV_store):
 		self.virtual_range = 20        
 		self.shard_interval = self.ring_edge // self.virtual_range
 		self.nodes = view
+
 		self.V_SHARDS = OrderedDict() # store all virtual shards
-		self.P_SHARDS = [[] for i in range(0, self.num_shards)] # map physical shards to nodes
+		self.P_SHARDS = [[] for i in range(self.num_shards)] # map physical shards to nodes
    
 		self.router = router
 		self.initial_sharding()
@@ -90,7 +91,7 @@ class Node(KV_store):
 	once mapping is done, sort
 	'''
 	def initial_sharding(self):
-		for p_shard in range(self.num_shards): 
+		for p_shard in range(self.num_shards) 
 			for v_shard in range(self.virtual_range):
 
 				virtural_shard = str(p_shard) + str(v_shard)
@@ -117,14 +118,13 @@ class Node(KV_store):
 
 		nodes.sort()
 
-		node_iter = 0
+		g_iter = 0
 		shard_num = 0
-		while node_iter < len(nodes):
-			if node_iter % self.repl_factor == 0 and node_iter != 0:
+		while g_iter < len(nodes):
+			if g_iter % self.repl_factor == 0:
 				shard_num += 1
 
-			self.P_SHARDS[shard_num].append(nodes[node_iter])
-			node_iter += 1
+			self.P_SHARDS[shard_num].append(nodes[g_iter])
 
 	'''
 	Add a single node to shards, must decide which shard to add to.
