@@ -15,21 +15,22 @@ class Node(KV_store):
 	'''docstring for node class'''
 	def __init__(self, router, address, view, replication_factor):
 		KV_store.__init__(self)
-		self.history = [("Initialized", datetime.now())]
-		self.transfers = []
+		self.history = [('Initialized', datetime.now())]
 
 		self.ADDRESS = address
 		self.ring_edge = 691 if len(view) < 100 else 4127    # parameter for hash mod value
 		self.repl_factor = replication_factor
 		self.num_shards = len(view) // replication_factor
-		self.virtual_range = 2        
+		self.virtual_range = 10        
 		self.shard_interval = self.ring_edge // self.virtual_range
 		self.nodes = view
-		self.V_SHARDS = OrderedDict() # store all virtual shards
+		self.shard_ID = -1
+		self.V_SHARDS = [] # store all virtual shards
 		self.P_SHARDS = [[] for i in range(0, self.num_shards)] # map physical shards to nodes
+		self.virtual_translation = {} # map virtual shards to physical shards
    
 		self.router = router
-		self.initial_sharding(view)
+		self.initial_sharding()
 
 	def __repr__(self):
 		return {'ADDRESS':self.ADDRESS, 'V_SHARDS':self.V_SHARDS, 'P_SHARDS':self.P_SHARDS, 'KEYS':len(self.keystore)}
@@ -52,6 +53,18 @@ class Node(KV_store):
 		return state
 
 	'''
+	return all physical shards
+	'''
+	def all_shards(self):
+		return self.P_SHARDS
+
+	'''
+	get all nodes in this shard
+	'''
+	def shard_replicas(self):
+		return self.P_SHARDS[self.shard_ID]
+
+	'''
 	Below are all key operations, these functions are used as a wraper for 
 	the key-value store to evaluate causal objects before actually writing
 	'''
@@ -62,18 +75,6 @@ class Node(KV_store):
 		pass
 
 	def delete_key(self, key):
-		pass
-
-	'''
-	parse the causal object to determine ordering
-	'''
-	def parse_causal_object(self, response):
-		pass
-
-	'''
-	define a gossip protocol to ensure eventual consistency among nodes in shard
-	'''
-	def anti_entropy(self):
 		pass
 
 	'''
@@ -89,22 +90,34 @@ class Node(KV_store):
 	construct virtual shards and map them to physical shards
 	once mapping is done, sort
 	'''
-	def initial_sharding(self, view):
-		for p_shard in range(self.num_shards): 
-			for v_shard in range(self.virtual_range):
+	def initial_sharding(self):
+		for p_shard in range(0, self.num_shards): 
+			
+			self.add_shard(p_shard)
 
-				virtural_shard = str(p_shard) + str(v_shard)
-				ring_num = self.hash(virtural_shard) # unique value on 'ring'
+		self.V_SHARDS.sort()
+		self.init_node_assignment(self.nodes)
 
-				# if ring_num is already in unsorted list, skip this iteration
-				if ring_num in self.V_SHARDS:
-					print('System: Hash collision detected')
-					continue
+	'''
+	add shard to view
+	'''
+	def add_shard(self, p_shard):
 
-				self.V_SHARDS[ring_num] = p_shard
+		new_shards = []
+		for v_shard in range(self.virtual_range):
 
-		self.V_SHARDS = (sorted(self.V_SHARDS.items()))
-		self.init_node_assignment(view)
+			virtural_shard = str(p_shard) + str(v_shard)
+			ring_num = self.hash(virtural_shard) # unique value on 'ring'
+
+			# if ring_num is already in unsorted list, skip this iteration
+			if ring_num in self.V_SHARDS:
+				print('<System: Hash collision detected>')
+				continue
+
+			self.V_SHARDS.append(ring_num)
+			self.virtual_translation[ring_num] = p_shard
+
+		return new_shards
 
 	'''
 	We want to evenly add replica nodes to shards, ie each shard gets
@@ -126,36 +139,10 @@ class Node(KV_store):
 				shard_num += 1
 
 			self.P_SHARDS[shard_num].append(vals[node_iter])
+			if vals[node_iter] == self.ADDRESS:
+				self.shard_ID = shard_num
+
 			node_iter += 1
-
-	'''
-	Add a single node to shards, must decide which shard to add to.
-	If len(nodes) + 1 // r > shard_num, we need to add a shard perform a re-shard
-	'''
-	def add_node(self, node):
-		if ((len(self.nodes) + 1) // self.repl_factor) > self.num_shards:
-			# must perform a shard shuffling 
-			pass
-
-		else:
-			ring_val = self.hash(node)
-			shard_ID = self.shard_ID(ring_val)
-			self.P_SHARDS[shard_ID].append(node)
-
-	'''
-	remove single node from a shard, determine if we need to re-shuffle shards
-	'''
-	def remove_node(self, node):
-		pass
-
-	'''
-	determine what physical shard this node is in
-	defined as: see where ring index / virtual range lands
-	'''
-	def shard_ID(self, ring_val):
-		node_num = self.V_SHARDS.index(ring_val)
-		shard = node_num // self.shard_interval
-		return shard
 
 	'''
 	Perform a key operation, ie find the correct shard given key.
@@ -165,12 +152,10 @@ class Node(KV_store):
 	def find_match(self, key):
 		
 		ring_val = self.hash(key)
-
-		# get the virtual ring number
+		# get the virtual shard number
 		v_shard = self.find_shard('predecessor', ring_val)
-
-		# convert to physical node ip
-		shard_ID = self.P_SHARDS[node_ring_val]
+		# convert to physical shard
+		shard_ID = self.virtual_translation[v_shard]
 
 		return shard_ID
 
@@ -193,31 +178,126 @@ class Node(KV_store):
 			return self.V_SHARDS[0]
 
 	'''
-	return all physical shards
-	'''
-	def all_shards(self):
-		return self.P_SHARDS
-
-	'''
 	respond to view change request, perform a reshard
 	this can only be done if all nodes have been given new view
+	2 cases:
+		1. len(nodes) + 1 // r > shard_num: we need to add a shard to maintain repl_factor
+		2. add node to correct shard
 	'''
 	def view_change(self, new_view):
-		pass
+		print('shards:', self.P_SHARDS)
+
+		add_nodes = list(set(new_view) - set(self.nodes))
+		remove_nodes = list(set(self.nodes) - set(new_view))
+
+		# determine if we need to add or remove a shard in order to maintain repl_factor
+		if ((len(self.nodes)+len(add_nodes)) // self.repl_factor) > self.num_shards:
+				self.update_shards('add', ((len(self.nodes)+len(add_nodes)) // self.repl_factor))
+
+		elif ((len(self.nodes)-len(remove_nodes)) // self.repl_factor) < self.num_shards:
+				self.update_shards('remove', ((len(self.nodes)-len(remove_nodes)) // self.repl_factor))
+
+		# add nodes to shard
+		for node in add_nodes:
+			self.add_node(node)
+
+		# remove nodes from shard
+		for node in remove_nodes:
+			self.remove_node(node)
+
+		print('shards:', self.P_SHARDS)
+
+		return self.ADDRESS, self.numberOfKeys()
 
 	'''
-	Perform a reshard, re-distribute minimun number of keys
-	Transfer all keys between new node and successor that should
-	belong to new node
+	add or remove a shard to the system in order to maintain repl_factor
+	must move some nodes to new shard as well as keys
 	'''
-	def reshard(self, type, node):
-		pass
+	def update_shards(self, action, num_shards):
+		if action == 'add':
+			for new_p_shard in range(self.num_shards+1, num_shards+1):
+
+				# transfer nodes to new shard
+				#self.transfer_nodes(new_p_shard)
+				self.add_shard(new_p_shard)
+				print("<adding shard: ID", new_p_shard, ">")
+				
+
+		else:
+			for old_shard in range(num_shards, self.num_shards):
+				pass
+
+	'''
+	transfer nodes to new shard: take one node from each shard
+	'''
+	def transfer_nodes(self, new_shard_ID):
+		if new_shard_ID >= len(self.P_SHARDS):
+			self.P_SHARDS.append([])
+
+		for shard in self.P_SHARDS:
+			if len(self.P_SHARDS[new_shard_ID-1]) >= self.repl_factor:
+				break
+			node = shard.pop()
+			self.P_SHARDS[new_shard_ID-1].append(node)
+			print('<moving', node, 'to new shard:', new_shard_ID-1, '>')
+
+		# recursive call if we need more than one node from each shard
+		if len(self.P_SHARDS[new_shard_ID-1]) < self.repl_factor:
+			self.transfer_nodes(new_shard_ID)
+
+	'''
+	transfer keys from one shard to another
+	'''
+	def transfer_keys(self):
+		for v in v_shards:
+
+			successor = self.find_shard('successor', v)
+			predecessor = self.find_shard('predecessor', v)
+
+			# if this node is the precessor a new v_shard, transfer keys over
+			if self.virtual_translation[predecessor] == self.shard_ID:
+				pass
+
+	'''
+	Add a single node to shards, must decide which shard to add to.
+	'''
+	def add_node(self, node):
+		self.nodes.append(node)
+
+		shard_ID = self.find_match(node)
+		self.P_SHARDS[shard_ID].append(node)
+		
+		# if the new node is being added to my shard, transfer my keys
+		if self.shard_ID == shard_ID:
+			print('<adding node: get keys from shard replicas>')
+			print('<get keys form shard', shard_ID)
+
+	'''
+	remove single node from a shard
+	'''
+	def remove_node(self, node):
+		self.nodes.pop(self.nodes.index(node))
+		if node == self.ADDRESS:
+			print('<send my final state to my replicas before removing') 
 
 	'''
 	transfer keys from this node to other nodes, must be an atomic operation
 	'''
-	def transfer(self, predecessor, new_node, successor):
+	def shard_broadcast(self, destination, message):
 		pass
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
