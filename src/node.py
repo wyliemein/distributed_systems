@@ -100,28 +100,6 @@ class Node(KV_store):
 		print('P_SHARDS', self.P_SHARDS)
 
 	'''
-	add shard to view
-	'''
-	def add_shard(self, p_shard):
-
-		new_shards = []
-		for v_shard in range(self.virtual_range):
-
-			virtural_shard = str(p_shard) + str(v_shard)
-			ring_num = self.hash(virtural_shard) # unique value on 'ring'
-
-			# if ring_num is already in unsorted list, skip this iteration
-			if ring_num in self.V_SHARDS:
-				print('<System: Hash collision detected>')
-				continue
-
-			self.V_SHARDS.append(ring_num)
-			self.virtual_translation[ring_num] = p_shard
-		self.num_shards += 1
-
-		return new_shards
-
-	'''
 	Perform a key operation, ie find the correct shard given key.
 	First hash the key then perform binary search to find the correct shard
 	to store the key. 
@@ -158,57 +136,117 @@ class Node(KV_store):
 	respond to view change request, perform a reshard
 	this can only be done if all nodes have been given new view
 	2 cases:
-		1. len(nodes) + 1 // r > shard_num: we need to add a shard to maintain repl_factor
-		2. add node to correct shard
+		1. len(nodes) + 1 // r > or < shard_num: we need to add or 
+			remove a shard to maintain repl_factor
+		2. add and/or remove nodes
 	'''
-	def view_change(self, view, shard_ID, shard_members):
+	def view_change(self, view, repl_factor):
 
-		if shard_ID >= self.num_shards and len(view)>0:
-			return self.view_change(view, 0, shard_members+1)
-		elif len(view) == 0:
-			return
+		new_num_shards = len(view) // repl_factor
 
-		# determine if we need to add or remove a shard in order to maintain repl_factor
-		diff = len(view) - len(self.nodes)
-		if (diff // self.repl_factor) > self.num_shards:
-				self.update_shards('add', (diff // self.repl_factor))
+		for node in view:
+			my_shard = self.hash(node) % new_num_shards
 
-		elif ((diff*-1) // self.repl_factor) < self.num_shards:
-				self.update_shards('remove', ((diff*-1) // self.repl_factor))
+			# add a new node
+			if node not in self.nodes:
+				self.add_node(my_shard, node)
 
-		node = view.pop(0)
+			# move node to new shard
+			if node not in self.P_SHARDS[my_shard]:
+				self.move_node(my_shard, node)
 
-		if node not in self.nodes:
-			if len(self.P_SHARDS[shard_ID]) < shard_members:
-				self.P_SHARDS[shard_ID].append(node)
-				self.add_node(node, shard_ID)
-				return self.view_change(view, shard_ID, shard_members)
+		old_nodes = list(set(self.nodes) - set(new_view))
 
-			else:
-				view.append(node)
-				return self.view_change(view, shard_ID+1, shard_members)
+		# remove nodes from view
+		for node in old_nodes:
+			my_shard = self.hash(node) % self.num_shards
+			self.remove_node(node)
+
+		# remove empty shards
+		for shard_ID in self.P_SHARDS:
+			if len(self.P_SHARDS[shard]) == 0:
+				self.remove_shard(shard_ID)
 
 	'''
-	add or remove a shard to the system in order to maintain repl_factor
-	must move some nodes to new shard as well as keys
+	Add a single node to shards and get keys from shard replicas
 	'''
-	def update_shards(self, action, num_shards):
-		if action == 'add':
-			for new_p_shard in range(self.num_shards+1, num_shards+1):
+	def add_node(self, node, shard_ID, shard_members):
 
-				self.add_shard(new_p_shard)
-				print("<adding shard: ID", new_p_shard, ">")
+		# do we need to add another shard before adding nodes
+		while shard_ID > len(self.P_SHARDS):
+			self.add_shard()
 
+		# update internal data structures
+		self.nodes.append(node)
+		self.P_SHARDS[shard_ID].append(node)
+
+		# determine if the node's shard is this shard
+		if self.shard_ID == shard_ID:
+			print('<adding node to:', shard_ID)
+			self.shard_keys()
+
+	'''
+	move node from old shard to new shard and perform atomic key transfer
+	'''
+	def move_node(self, shard_ID, node):
+		
+		old_shard_ID = self.hash(node) % self.num_shards
+		
+		# do we need to add another shard before adding nodes
+		while shard_ID > len(self.P_SHARDS):
+			self.add_shard()
+
+		success = self.atomic_key_transfer(old_shard_ID, shard_ID, node)
+		if success:
+			self.P_SHARDS[shard_ID].append(node)
 		else:
-			for old_shard in range(num_shards, self.num_shards):
-				pass
+			raise Exception("<atomic_key_transfer failed>")
 
-		self.V_SHARDS.sort()
+	'''
+	remove single node from a shard and send final state to shard replicas
+	'''
+	def remove_node(self, node):
+
+		if node == self.ADDRESS:
+			print('<send my final state to my replicas before removing') 
+			success = self.final_state_transfer(node)
+
+			if success:
+				self.nodes.pop(self.nodes.index(node))
+
+	'''
+	add shard to view
+	'''
+	def add_shard(self):
+
+		new_shards = []
+		for v_shard in range(self.virtual_range):
+
+			virtural_shard = str(p_shard) + str(v_shard)
+			ring_num = self.hash(virtural_shard) # unique value on 'ring'
+
+			# if ring_num is already in unsorted list, skip this iteration
+			if ring_num in self.V_SHARDS:
+				print('<System: Hash collision detected>')
+				continue
+
+			self.V_SHARDS.append(ring_num)
+			self.virtual_translation[ring_num] = p_shard
+		self.num_shards += 1
+
+		return new_shards
+
+	'''
+	remove from all internal data structures if there are no nodes in shard
+	'''
+	def remove_shard(self, view, repl_factor, num_shards):
+		pass
 
 	'''
 	transfer keys from one shard to another
+	send keys from origin shard replicas to new shard replicas
 	'''
-	def transfer_keys(self):
+	def keys_transfer(self):
 		for v in v_shards:
 
 			successor = self.find_shard('successor', v)
@@ -219,38 +257,22 @@ class Node(KV_store):
 				pass
 
 	'''
-	Add a single node to shards, must decide which shard to add to.
+	get all keys for a given shard
 	'''
-	def add_node(self, node, shard_ID, shard_members):
-		if node not in self.nodes:
-			self.nodes.append(node)
-
-		# if the new node is being added to my shard, transfer my keys
-		if self.shard_ID == shard_ID:
-			print('<adding node: get keys from shard replicas>')
-			print('<get keys form shard', shard_ID)
-
-		if len(self.P_SHARDS[shard_ID]) < shard_members:
-				self.P_SHARDS[shard_ID].append(node)
-				self.add_node(node, shard_ID)
-				return self.view_change(view, shard_ID, shard_members)
-
-			else:
-				view.append(node)
-				return self.view_change(view, shard_ID+1, shard_members)
+	def shard_keys(self):
+		pass
 
 	'''
-	remove single node from a shard
+	perform an atomic key transfer
+	concurrent operation: get new keys, send old keys, delete old keys
 	'''
-	def remove_node(self, node):
-		self.nodes.pop(self.nodes.index(node))
-		if node == self.ADDRESS:
-			print('<send my final state to my replicas before removing') 
+	def atomic_key_transfer(self, old_shard_ID, new_shard_ID, node):
+		pass
 
 	'''
-	transfer keys from this node to other nodes, must be an atomic operation
+	send final state of node before removing a node
 	'''
-	def shard_broadcast(self, destination, message):
+	def final_state_transfer(self, node):
 		pass
 
 
