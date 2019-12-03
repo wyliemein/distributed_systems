@@ -95,8 +95,9 @@ class Node(KV_store):
 			
 			self.add_shard(p_shard)
 
-		self.V_SHARDS.sort()
-		self.init_node_assignment(self.nodes)
+		view = self.nodes.copy()
+		self.view_change(view, 0, self.repl_factor)
+		print('P_SHARDS', self.P_SHARDS)
 
 	'''
 	add shard to view
@@ -116,33 +117,9 @@ class Node(KV_store):
 
 			self.V_SHARDS.append(ring_num)
 			self.virtual_translation[ring_num] = p_shard
+		self.num_shards += 1
 
 		return new_shards
-
-	'''
-	We want to evenly add replica nodes to shards, ie each shard gets
-	repl_factor number of shards
-	'''
-	def init_node_assignment(self, view):
-		nodes = {}
-		for ip_port in view:
-			node_num = self.hash(ip_port)
-			nodes[node_num] = ip_port
-
-		nodes = OrderedDict(sorted(nodes.items()))
-		vals = list(nodes.values())
-
-		node_iter = 0
-		shard_num = 0
-		while node_iter < len(nodes):
-			if node_iter % self.repl_factor == 0 and node_iter != 0:
-				shard_num += 1
-
-			self.P_SHARDS[shard_num].append(vals[node_iter])
-			if vals[node_iter] == self.ADDRESS:
-				self.shard_ID = shard_num
-
-			node_iter += 1
 
 	'''
 	Perform a key operation, ie find the correct shard given key.
@@ -184,30 +161,32 @@ class Node(KV_store):
 		1. len(nodes) + 1 // r > shard_num: we need to add a shard to maintain repl_factor
 		2. add node to correct shard
 	'''
-	def view_change(self, new_view):
-		print('shards:', self.P_SHARDS)
+	def view_change(self, view, shard_ID, shard_members):
 
-		add_nodes = list(set(new_view) - set(self.nodes))
-		remove_nodes = list(set(self.nodes) - set(new_view))
+		if shard_ID >= self.num_shards and len(view)>0:
+			return self.view_change(view, 0, shard_members+1)
+		elif len(view) == 0:
+			return
 
 		# determine if we need to add or remove a shard in order to maintain repl_factor
-		if ((len(self.nodes)+len(add_nodes)) // self.repl_factor) > self.num_shards:
-				self.update_shards('add', ((len(self.nodes)+len(add_nodes)) // self.repl_factor))
+		diff = len(view) - len(self.nodes)
+		if (diff // self.repl_factor) > self.num_shards:
+				self.update_shards('add', (diff // self.repl_factor))
 
-		elif ((len(self.nodes)-len(remove_nodes)) // self.repl_factor) < self.num_shards:
-				self.update_shards('remove', ((len(self.nodes)-len(remove_nodes)) // self.repl_factor))
+		elif ((diff*-1) // self.repl_factor) < self.num_shards:
+				self.update_shards('remove', ((diff*-1) // self.repl_factor))
 
-		# add nodes to shard
-		for node in add_nodes:
-			self.add_node(node)
+		node = view.pop(0)
 
-		# remove nodes from shard
-		for node in remove_nodes:
-			self.remove_node(node)
+		if node not in self.nodes:
+			if len(self.P_SHARDS[shard_ID]) < shard_members:
+				self.P_SHARDS[shard_ID].append(node)
+				self.add_node(node, shard_ID)
+				return self.view_change(view, shard_ID, shard_members)
 
-		print('shards:', self.P_SHARDS)
-
-		return self.ADDRESS, self.numberOfKeys()
+			else:
+				view.append(node)
+				return self.view_change(view, shard_ID+1, shard_members)
 
 	'''
 	add or remove a shard to the system in order to maintain repl_factor
@@ -217,33 +196,14 @@ class Node(KV_store):
 		if action == 'add':
 			for new_p_shard in range(self.num_shards+1, num_shards+1):
 
-				# transfer nodes to new shard
-				#self.transfer_nodes(new_p_shard)
 				self.add_shard(new_p_shard)
 				print("<adding shard: ID", new_p_shard, ">")
-				
 
 		else:
 			for old_shard in range(num_shards, self.num_shards):
 				pass
 
-	'''
-	transfer nodes to new shard: take one node from each shard
-	'''
-	def transfer_nodes(self, new_shard_ID):
-		if new_shard_ID >= len(self.P_SHARDS):
-			self.P_SHARDS.append([])
-
-		for shard in self.P_SHARDS:
-			if len(self.P_SHARDS[new_shard_ID-1]) >= self.repl_factor:
-				break
-			node = shard.pop()
-			self.P_SHARDS[new_shard_ID-1].append(node)
-			print('<moving', node, 'to new shard:', new_shard_ID-1, '>')
-
-		# recursive call if we need more than one node from each shard
-		if len(self.P_SHARDS[new_shard_ID-1]) < self.repl_factor:
-			self.transfer_nodes(new_shard_ID)
+		self.V_SHARDS.sort()
 
 	'''
 	transfer keys from one shard to another
@@ -261,16 +221,23 @@ class Node(KV_store):
 	'''
 	Add a single node to shards, must decide which shard to add to.
 	'''
-	def add_node(self, node):
-		self.nodes.append(node)
+	def add_node(self, node, shard_ID, shard_members):
+		if node not in self.nodes:
+			self.nodes.append(node)
 
-		shard_ID = self.find_match(node)
-		self.P_SHARDS[shard_ID].append(node)
-		
 		# if the new node is being added to my shard, transfer my keys
 		if self.shard_ID == shard_ID:
 			print('<adding node: get keys from shard replicas>')
 			print('<get keys form shard', shard_ID)
+
+		if len(self.P_SHARDS[shard_ID]) < shard_members:
+				self.P_SHARDS[shard_ID].append(node)
+				self.add_node(node, shard_ID)
+				return self.view_change(view, shard_ID, shard_members)
+
+			else:
+				view.append(node)
+				return self.view_change(view, shard_ID+1, shard_members)
 
 	'''
 	remove single node from a shard
