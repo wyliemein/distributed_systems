@@ -36,7 +36,7 @@ class Node(KV_store):
 		return {'ADDRESS':self.ADDRESS, 'V_SHARDS':self.V_SHARDS, 'P_SHARDS':self.P_SHARDS, 'KEYS':len(self.keystore)}
 
 	def __str__(self):
-		return 'ADDRESS: '+self.ADDRESS+'\nV_SHARDS: '+(', '.join(map(str, self.V_SHARDS))) + '\nP_SHARDS: ' + (', '.join(map(str, self.P_SHARDS)))
+		return 'ADDRESS: '+self.ADDRESS+'\nREPL_F: '+str(self.repl_factor)+'\nNODES: '+(', '.join(map(str, self.nodes))) + '\nP_SHARDS: ' + (', '.join(map(str, self.P_SHARDS)))
 
 	'''
 	give a state report 
@@ -89,6 +89,22 @@ class Node(KV_store):
 		# may be expensive but will produce better distribution
 		return (hash_val % self.ring_edge)
 
+	def distribute(self, repl_factor, elements):
+
+		even_dict = {}
+		g_iter = 0
+		shard_num = 0
+		elements.sort()
+
+		while g_iter < len(elements):
+			if g_iter % repl_factor == 0 and g_iter != 0:
+				shard_num += 1
+
+			even_dict[elements[g_iter]] = shard_num
+			g_iter += 1
+
+		return even_dict
+
 	'''
 	Perform a key operation, ie. find the correct shard given key.
 	First hash the key then perform binary search to find the correct shard
@@ -136,31 +152,36 @@ class Node(KV_store):
 		if new_num_shards == 1:
 			new_num_shards = 2
 
+		buckets = self.distribute(repl_factor, view)
+
+		print("buckets", buckets)
+
 		# add nodes and shards
 		for node in view:
-			my_shard = int(self.hash(node, 'mod') % new_num_shards)
-			#print(self.hash(node, 'mod'), 'mod', new_num_shards, ' = ', my_shard)
+			my_shard = buckets[node]
 
 			# add a new node
 			if node not in self.nodes:
 				self.add_node(node, my_shard, new_num_shards)
 
 			# move node to new shard
-			elif node not in self.P_SHARDS[my_shard]:
-				#print("moving", node, "to shard", my_shard)
-				self.move_node(node, my_shard)
+			else:
+				if my_shard >= len(self.P_SHARDS):
+					self.add_shard()
+				if node not in self.P_SHARDS[my_shard]:
+					#print('moving', node, 'to', my_shard)
+					self.move_node(node, my_shard)
 
 		old_nodes = list(set(self.nodes) - set(view))
-		#print("old_nodes", old_nodes)
 
 		# remove nodes from view
 		for node in old_nodes:
-			my_shard = self.hash(node, 'mod') % self.num_shards
-			self.remove_node(node, my_shard)
+			self.remove_node(node)
 
 		# remove empty shards
 		for shard_ID in range(0, len(self.P_SHARDS)):
 			if len(self.P_SHARDS[shard_ID]) == 0:
+				print('remove shard:', shard_ID)
 				self.remove_shard(shard_ID)
 
 	'''
@@ -172,8 +193,12 @@ class Node(KV_store):
 		while num_shards > self.num_shards:
 			self.add_shard()
 
+		print("num_shards:", num_shards)
+		print("shard_ID:", shard_ID)
+
 		# update internal data structures
 		self.nodes.append(node)
+		self.nodes.sort()
 		self.P_SHARDS[shard_ID].append(node)
 
 		# determine if the node's shard is this shard
@@ -186,7 +211,9 @@ class Node(KV_store):
 	'''
 	def move_node(self, node, shard_ID):
 		
-		old_shard_ID = int(self.hash(node, 'mod') % self.num_shards)
+		old_shard_ID = self.nodes.index(node) // self.num_shards
+		if node not in self.P_SHARDS[old_shard_ID]:
+			print("error finding old shard")
 		
 		# do we need to add another shard before adding nodes
 		while shard_ID > len(self.P_SHARDS):
@@ -201,7 +228,8 @@ class Node(KV_store):
 	'''
 	remove single node from a shard and send final state to shard replicas
 	'''
-	def remove_node(self, node, shard_ID):
+	def remove_node(self, node):
+		shard_ID = self.nodes.index(node) // self.num_shards
 
 		if node == self.ADDRESS:
 			print('<send my final state to my replicas before removing') 
@@ -232,7 +260,7 @@ class Node(KV_store):
 
 			# if ring_num is already in unsorted list, skip this iteration
 			if ring_num in self.V_SHARDS:
-				print('<System: Hash collision detected>')
+				#print('<System: Hash collision detected>')
 				continue
 
 			self.V_SHARDS.append(ring_num)
