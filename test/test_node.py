@@ -69,8 +69,21 @@ class Test_Shard_Methods(unittest.TestCase):
 		print(shard)
 		self.assertTrue(new_card>old_card)
 
-	"""def test_view_change_remove_shard(self):
-		pass"""
+	def test_view_change_remove_shard(self):
+		print("test5\n")
+		view = [addr1, addr2, addr3, addr4, addr5, addr6]
+		shard = Node(router, addr1, view, repl_factor)
+		print(shard)
+
+		old_card = len(shard.nodes)
+		new_view = [addr1, addr2, addr3, addr4]
+
+		shard.view_change(new_view, repl_factor)
+
+		new_card = len(shard.nodes)
+		print(shard)
+		self.assertTrue(old_card>new_card)
+
 
 if __name__ == '__main__':
 	unittest.main()

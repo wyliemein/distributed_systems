@@ -249,7 +249,11 @@ class Node(KV_store):
 	def remove_node(self, node):
 		shard_ID = (self.nodes.index(node)-1) // self.num_shards
 		if shard_ID > 0 and shard_ID < len(self.P_SHARDS) and node not in self.P_SHARDS[shard_ID]:
-			print('error finding node')
+			if shard_ID > 0 and node in self.P_SHARDS[shard_ID-1]:
+				shard_ID += -1
+			else:
+				shard_ID += 1
+			#print('error finding node')
 
 		if node == self.ADDRESS:
 			print('<send my final state to my replicas before removing') 
@@ -294,7 +298,7 @@ class Node(KV_store):
 	remove from all internal data structures if there are no nodes in shard
 	'''
 	def remove_shard(self, shard_ID):
-		pass
+		self.P_SHARDS.pop(shard_ID)
 
 	'''
 	transfer keys from one shard to another
