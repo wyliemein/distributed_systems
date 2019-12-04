@@ -2,21 +2,24 @@ from flask import jsonify
 
 import sys
 
-class Node():
+class VectorClock():
     
-    def __init__(self):
-        self.vectorclock = {}
-    
+    vectorclock = {}
+
     def increment(self, index):
-        self.vectorclock[index] += 1
+        self.vectorclock[index] = self.vectorclock[index] + 1
+        return self
     
-    def returnClock:
-        return jsonisfy({
-            self.vectorclock
-        })
+    def returnClock(self):
+        // NEED TO RETURN JSON OBECT
+        return jsonify(self.vectorclock)
     
-    def appendShard(self, node):
-        self.vectorclock(node, 0)
+    def appendShard(self, index):
+        self.vectorclock[index] = 0
+
+    def printclock(self):
+        for x, y in self.vectorclock.items():
+            print(x, y)
     
 
 
