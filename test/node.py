@@ -83,7 +83,7 @@ class Node(KV_store):
 	'''
 	hash frunction is a composit of xxhash modded by prime
 	'''
-	def hash(self, key):
+	def hash(self, key, Type):
 		hash_val = hasher.xxh32(key).intdigest()
 
 		# may be expensive but will produce better distribution
@@ -96,7 +96,7 @@ class Node(KV_store):
 	'''
 	def find_match(self, key):
 		
-		ring_val = self.hash(key)
+		ring_val = self.hash(key, 'consistent')
 		# get the virtual shard number
 		v_shard = self.find_shard('predecessor', ring_val)
 		# convert to physical shard
@@ -133,25 +133,30 @@ class Node(KV_store):
 	def view_change(self, view, repl_factor):
 
 		new_num_shards = len(view) // repl_factor
+		if new_num_shards == 1:
+			new_num_shards = 2
 
 		# add nodes and shards
 		for node in view:
-			my_shard = int(self.hash(node) % new_num_shards)
+			my_shard = int(self.hash(node, 'mod') % new_num_shards)
+			#print(self.hash(node, 'mod'), 'mod', new_num_shards, ' = ', my_shard)
 
 			# add a new node
 			if node not in self.nodes:
 				self.add_node(node, my_shard, new_num_shards)
 
 			# move node to new shard
-			if node not in self.P_SHARDS[my_shard]:
-				self.move_node(my_shard, node)
+			elif node not in self.P_SHARDS[my_shard]:
+				#print("moving", node, "to shard", my_shard)
+				self.move_node(node, my_shard)
 
 		old_nodes = list(set(self.nodes) - set(view))
+		#print("old_nodes", old_nodes)
 
 		# remove nodes from view
 		for node in old_nodes:
-			my_shard = self.hash(node) % self.num_shards
-			self.remove_node(node)
+			my_shard = self.hash(node, 'mod') % self.num_shards
+			self.remove_node(node, my_shard)
 
 		# remove empty shards
 		for shard_ID in range(0, len(self.P_SHARDS)):
@@ -179,9 +184,9 @@ class Node(KV_store):
 	'''
 	move node from old shard to new shard and perform atomic key transfer
 	'''
-	def move_node(self, shard_ID, node):
+	def move_node(self, node, shard_ID):
 		
-		old_shard_ID = int(self.hash(node) % self.num_shards)
+		old_shard_ID = int(self.hash(node, 'mod') % self.num_shards)
 		
 		# do we need to add another shard before adding nodes
 		while shard_ID > len(self.P_SHARDS):
@@ -196,7 +201,7 @@ class Node(KV_store):
 	'''
 	remove single node from a shard and send final state to shard replicas
 	'''
-	def remove_node(self, node):
+	def remove_node(self, node, shard_ID):
 
 		if node == self.ADDRESS:
 			print('<send my final state to my replicas before removing') 
@@ -206,6 +211,9 @@ class Node(KV_store):
 				self.nodes.pop(self.nodes.index(node))
 			else:
 				raise Exception('<final_state_transfer failed>')
+		else:
+			self.nodes.pop(self.nodes.index(node))
+			self.P_SHARDS[shard_ID].pop(self.P_SHARDS[shard_ID].index(node))
 
 	'''
 	add shard to view
@@ -220,7 +228,7 @@ class Node(KV_store):
 		for v_shard in range(self.virtual_range):
 
 			virtural_shard = str(p_shard) + str(v_shard)
-			ring_num = self.hash(virtural_shard) # unique value on 'ring'
+			ring_num = self.hash(virtural_shard, 'consistent') # unique value on 'ring'
 
 			# if ring_num is already in unsorted list, skip this iteration
 			if ring_num in self.V_SHARDS:

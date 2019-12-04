@@ -17,14 +17,14 @@ repl_factor = 2
 
 class Test_Shard_Methods(unittest.TestCase):
 
-	def test_initial_state(self):
+	"""def test_initial_state(self):
 		print("test0\n")
 		view = [addr1, addr2, addr3, addr4]
 		shard = Node(router, addr1, view, repl_factor)
 		print(shard)
 		self.assertTrue(shard != None)
 
-	"""def test_view_change_add_node(self):
+	def test_view_change_add_node(self):
 		print("test2\n")
 		view = [addr1, addr2, addr3, addr4]
 		shard = Node(router, addr1, view, repl_factor)
@@ -32,23 +32,27 @@ class Test_Shard_Methods(unittest.TestCase):
 		new_view = view.copy()
 		new_view.append(addr5)
 
-		shard.view_change(new_view, 0, repl_factor)
+		shard.view_change(new_view, repl_factor)
 		new_card = len(shard.nodes)
-		self.assertTrue(new_card>old_card)
+
+		print(shard)
+		self.assertTrue(new_card>old_card)"""
 
 	def test_view_change_remove_node(self):
 		print("test3\n")
 		view = [addr1, addr2, addr3, addr4]
 		shard = Node(router, addr1, view, repl_factor)
+		print("\n")
 		old_card = len(shard.nodes)
 	
 		new_view = [addr1, addr2, addr3]
 
-		shard.view_change(new_view, 0)
+		shard.view_change(new_view, repl_factor)
 		new_card = len(shard.nodes)
+		print(shard)
 		self.assertTrue(new_card<old_card)
 
-	def test_view_change_add_shard(self):
+	"""def test_view_change_add_shard(self):
 		print("test4\n")
 		view = [addr1, addr2, addr3, addr4]
 		shard = Node(router, addr1, view, repl_factor)
