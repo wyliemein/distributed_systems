@@ -105,6 +105,29 @@ class Node(KV_store):
 
 		return even_dict
 
+	def even_distribution(self, repl_factor, nodes):
+
+		nodes.sort()
+		num_shards = (len(nodes) // repl_factor)
+		replicas = (len(nodes) // num_shards)
+		overflow = (len(nodes) % num_shards)
+
+		shards = [[] for i in range(0, num_shards)]
+		shard_dict = {}
+
+		node_iter = 0
+		for shard in range(num_shards):
+			extra = (1 if shard < overflow else 0)
+			interval = replicas + extra
+
+			shards[shard] = nodes[node_iter:(node_iter+interval)]
+			node_iter += interval
+
+			for node in shards[shard]:
+				shard_dict[node] = shard
+
+		return shard_dict
+
 	'''
 	Perform a key operation, ie. find the correct shard given key.
 	First hash the key then perform binary search to find the correct shard
@@ -152,9 +175,8 @@ class Node(KV_store):
 		if new_num_shards == 1:
 			new_num_shards = 2
 
-		buckets = self.distribute(repl_factor, view)
-
-		print("buckets", buckets)
+		buckets = self.even_distribution(repl_factor, view)
+		#print('buckets', buckets)
 
 		# add nodes and shards
 		for node in view:
@@ -169,7 +191,6 @@ class Node(KV_store):
 				if my_shard >= len(self.P_SHARDS):
 					self.add_shard()
 				if node not in self.P_SHARDS[my_shard]:
-					#print('moving', node, 'to', my_shard)
 					self.move_node(node, my_shard)
 
 		old_nodes = list(set(self.nodes) - set(view))
@@ -181,7 +202,6 @@ class Node(KV_store):
 		# remove empty shards
 		for shard_ID in range(0, len(self.P_SHARDS)):
 			if len(self.P_SHARDS[shard_ID]) == 0:
-				print('remove shard:', shard_ID)
 				self.remove_shard(shard_ID)
 
 	'''
@@ -192,9 +212,6 @@ class Node(KV_store):
 		# do we need to add another shard before adding nodes
 		while num_shards > self.num_shards:
 			self.add_shard()
-
-		print("num_shards:", num_shards)
-		print("shard_ID:", shard_ID)
 
 		# update internal data structures
 		self.nodes.append(node)
@@ -213,23 +230,26 @@ class Node(KV_store):
 		
 		old_shard_ID = self.nodes.index(node) // self.num_shards
 		if node not in self.P_SHARDS[old_shard_ID]:
-			print("error finding old shard")
+			if old_shard_ID > 0 and node in self.P_SHARDS[old_shard_ID-1]:
+				old_shard_ID += -1
+			else:
+				old_shard_ID += 1
 		
 		# do we need to add another shard before adding nodes
 		while shard_ID > len(self.P_SHARDS):
 			self.add_shard()
 
-		success = self.atomic_key_transfer(old_shard_ID, shard_ID, node)
-		if success:
-			self.P_SHARDS[shard_ID].append(node)
-		else:
-			raise Exception('<atomic_key_transfer failed>')
+		self.atomic_key_transfer(old_shard_ID, shard_ID, node)
+		self.P_SHARDS[shard_ID].append(node)
+		self.P_SHARDS[old_shard_ID].pop(self.P_SHARDS[old_shard_ID].index(node))
 
 	'''
 	remove single node from a shard and send final state to shard replicas
 	'''
 	def remove_node(self, node):
-		shard_ID = self.nodes.index(node) // self.num_shards
+		shard_ID = (self.nodes.index(node)-1) // self.num_shards
+		if shard_ID > 0 and shard_ID < len(self.P_SHARDS) and node not in self.P_SHARDS[shard_ID]:
+			print('error finding node')
 
 		if node == self.ADDRESS:
 			print('<send my final state to my replicas before removing') 
@@ -273,7 +293,7 @@ class Node(KV_store):
 	'''
 	remove from all internal data structures if there are no nodes in shard
 	'''
-	def remove_shard(self, view, repl_factor, num_shards):
+	def remove_shard(self, shard_ID):
 		pass
 
 	'''
