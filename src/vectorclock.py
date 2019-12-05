@@ -20,6 +20,10 @@ class VectorClock():
     def printclock(self):
         for x, y in self.vectorclock.items():
             print(x, y)
+
+    def compareClocks(vc):
+        # compare vc to self.vectorclock
+        pass
     
 
 

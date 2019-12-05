@@ -42,11 +42,17 @@ all production/public endpoints
 '''
 
 '''
-get number of keys for a node and replicas
+get number of keys for a node and stored replicas
 '''
 @app.route('/kv-store/key-count', methods=['GET'])
 def get_key_count():
-	key_count = shard.numberOfKeys()
+
+	data = request.get_json()
+	causal_obj = data.get('causal-context')
+
+	# this has to be 
+	#key_count = shard.numberOfKeys()
+	key_count = 0
 
 	return jsonify({
 				'key_count'     : key_count

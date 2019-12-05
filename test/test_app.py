@@ -2,6 +2,8 @@ import unittest
 import collections
 from node import Node
 from Message import Router
+import requests
+import json
 
 # example node addresses
 addr1="10.10.0.2:13800"
@@ -16,7 +18,16 @@ class Test_API_endpoints(unittest.TestCase):
 	# simple system tests
 	# -------------------------------------------------------------------------
 	def test_get_key_count(self):
-		pass
+		port = addr1.split(':')[1]
+		path = '/kv-store/key-count'
+		endpoint = 'http://127.0.0.1:13802/kv-store/key-count'
+		headers = {'content-type': 'application/json'}
+		payload = '{"causal-context": {}}'
+
+		res = requests.get(endpoint, data=payload, headers=headers)
+		if res.ok:
+			json_res = res.json()
+			print('<key count is', json_res['key_count'], '>')
 
 	def test_get_ID_and_key_count(self):
 		pass

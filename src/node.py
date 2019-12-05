@@ -5,13 +5,14 @@ and shard membership.
 
 import xxhash as hasher
 from bisect import bisect_right, bisect_left
-from storage_host import KV_store
 from datetime import datetime
 import json
 from collections import OrderedDict
+from storage_host import KV_store
+from vectroclock import VectorClock
 
 
-class Node(KV_store):
+class Node(KV_store, VectorClock):
 	'''docstring for node class'''
 	def __init__(self, router, address, view, replication_factor):
 		KV_store.__init__(self)
@@ -320,6 +321,8 @@ class Node(KV_store):
 	'''
 	def final_state_transfer(self, node):
 		return True
+
+
 
 
 
