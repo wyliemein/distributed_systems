@@ -18,13 +18,14 @@ full_view=${initial_full_view},${addr3},${addr4}
 
 read -d '' view_change_data << "VIEW_STR"
 {
-    "view": [
+    "causal-context": {},
+    "repl-factor"   : 2,
+    "view"          : [
         "10.10.0.2:13800",
         "10.10.0.3:13800",
         "10.10.0.4:13800",
         "10.10.0.5:13800"
-    ],
-    "repl-factor": 2
+    ]
 }
 VIEW_STR
 
@@ -32,12 +33,14 @@ docker run --name="node1"        --net=kv_subnet     \
            --ip=10.10.0.2        -p 13802:13800      \
            -e ADDRESS="${addr1}"                     \
            -e VIEW=${initial_full_view}              \
+           -e REPL_FACTOR=2                          \
            kv-store:4.0
 
 docker run --name="node2"        --net=kv_subnet     \
            --ip=10.10.0.3        -p 13803:13800      \
            -e ADDRESS="${addr2}"                     \
            -e VIEW=${initial_full_view}              \
+           -e REPL_FACTOR=2                          \
            kv-store:4.0
 
 # ------------------------------
@@ -85,17 +88,19 @@ docker run --name="node3" --net=kv_subnet                          \
            --ip=10.10.0.4  -p 13804:13800                          \
            -e ADDRESS="${addr3}"                                   \
            -e VIEW="${full_view}"                                  \
+           -e REPL_FACTOR=2                                        \
            kv-store:4.0
 
 docker run --name="node4" --net=kv_subnet                          \
            --ip=10.10.0.5  -p 13805:13800                          \
            -e ADDRESS="${addr4}"                                   \
            -e VIEW="${full_view}"                                  \
+           -e REPL_FACTOR=2                                        \
            kv-store:4.0
 
 curl --request PUT                                                 \
      --header "Content-Type: application/json"                     \
-     --data "{\"view\": \"${full_view}\", \"causal-context\": {}}" \
+     --data $view_change_data                                      \
      --write-out "%{http_code}\n"                                  \
      http://${addr2}/kv-store/view-change
 
