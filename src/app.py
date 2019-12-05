@@ -47,15 +47,35 @@ get number of keys for a node and stored replicas
 @app.route('/kv-store/key-count', methods=['GET'])
 def get_key_count():
 
-	data = request.get_json()
-	causal_obj = data.get('causal-context')
+	#data = request.get_json()
+	#causal_obj = data.get('causal-context')
+	all_replicas = shard.shard_replicas() 
+	KEY_COUNT = my_key_count = shard.numberOfKeys()
 
-	# this has to be 
-	#key_count = shard.numberOfKeys()
-	key_count = 0
+	for node in all_replicas:
+		if node == shard.ADDRESS:
+			continue
+
+		# internal request
+		forward = False
+		data = None
+
+		# ADDRESS, PATH, OP, keyName, DATA, FORWARD
+		res, status_code = router.GET(node, path, data, forward)
+		jsonResponse = json.loads(res.decode('utf-8'))
+		rep_key_count = (jsonResponse['key_count'])
+		rep_vector_clock = shard.json_to_vc(jsonResponse['VC'])
+
+		if my_key_count != rep_key_count:
+			if shard.local_is_greater(rep_vector_clock):
+				# should use gossip protocol to let reps know latest state
+				pass
+			else:
+				KEY_COUNT = rep_key_count
+				# update my local state and use gossip protocol to let reps know latest state
 
 	return jsonify({
-				'key_count'     : key_count
+				'key_count'     : KEY_COUNT
 	}), 200
 
 '''
@@ -143,9 +163,7 @@ get/put/delete key for shard
 '''
 @app.route('/kv-store/keys/<keyName>', methods=['GET', 'PUT', 'DELETE'])
 def update_keys(keyName):
-	pass
 
-	'''
 	# find the shard that is associated with this key
 	key_shard = shard.find_match(keyName)
 
@@ -160,12 +178,25 @@ def update_keys(keyName):
 		data = None
 
 		return router.FORWARD(key_shard, method, path, keyName, data)
-		'''
 
 '''
 all internal endpoints
 ---------------------------------------------------------------------------------
 '''
+
+'''
+internal shard key count
+'''
+@app.route("/kv-store/internal/key-count", methods=["GET"])
+def internal_key_count():
+
+	data = request.get_json()
+	causal_obj = data.get('causal-context')
+	key_count = shard.numberOfKeys()
+
+	return jsonify({
+				"key_count"     : key_count
+	}), 200
 
 '''
 internal key transfer
