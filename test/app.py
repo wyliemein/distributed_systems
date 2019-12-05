@@ -120,7 +120,8 @@ def get_shards():
 get state information for specific shard
 '''
 @app.route('/kv-store/shards/<id>', methods=['GET'])
-def get_shard():
+def get_shard(id):
+	
 	pass
 
 '''

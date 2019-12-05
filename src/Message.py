@@ -14,7 +14,7 @@ class Router():
 		self.timeout = 5
 
 	# -------------------------------------------------------------------------
-	def timeout(time):
+	def timeout(self, time):
 		# Register a function to raise a TimeoutError on the signal.
 		signal.signal(signal.SIGALRM, raise_timeout)
 		# Schedule the signal to be sent after ``time``.

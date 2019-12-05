@@ -159,7 +159,6 @@ class Node(KV_store, VectorClock):
 		2. add and/or remove nodes
 	'''
 	def view_change(self, view, repl_factor):
-
 		new_num_shards = len(view) // repl_factor
 		if new_num_shards == 1:
 			new_num_shards = 2

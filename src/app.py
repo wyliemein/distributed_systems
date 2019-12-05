@@ -274,7 +274,6 @@ def guarantee_causal_consistency(all_replicas, keyName, method):
 				if shard.first_is_greater(vc, max_VC):
 					RES = res
 					max_VC = vc
-
 		except:
 			shard.handle_unresponsive_node(replica)
 			continue
