@@ -9,7 +9,7 @@ from datetime import datetime
 import json
 from collections import OrderedDict
 from storage_host import KV_store
-from vectroclock import VectorClock
+from vectorclock import VectorClock
 
 
 class Node(KV_store, VectorClock):
@@ -65,8 +65,8 @@ class Node(KV_store, VectorClock):
 	'''
 	get all nodes in this shard
 	'''
-	def shard_replicas(self):
-		return self.P_SHARDS[self.shard_ID]
+	def shard_replicas(self, shard_ID):
+		return self.P_SHARDS[shard_ID]
 
 	'''
 	Below are all key operations, these functions are used as a wraper for 
@@ -321,6 +321,12 @@ class Node(KV_store, VectorClock):
 	'''
 	def final_state_transfer(self, node):
 		return True
+
+	'''
+	handle node failures, check if node should be removed or not
+	'''
+	def handle_unresponsive_node(self, node):
+		pass
 
 
 

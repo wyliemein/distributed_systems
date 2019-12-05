@@ -19,7 +19,6 @@ class Test_API_endpoints(unittest.TestCase):
 	# -------------------------------------------------------------------------
 	def test_get_key_count(self):
 		port = addr1.split(':')[1]
-		path = '/kv-store/key-count'
 		endpoint = 'http://127.0.0.1:13802/kv-store/key-count'
 		headers = {'content-type': 'application/json'}
 		payload = '{"causal-context": {}}'
@@ -41,7 +40,18 @@ class Test_API_endpoints(unittest.TestCase):
 	# key operations
 	# -------------------------------------------------------------------------
 	def test_insert_new_key(self):
-		pass
+		port = addr1.split(':')[1]
+		endpoint = 'http://127.0.0.1:13802/kv-store/keys/sampleKey'
+		headers = {'content-type': 'application/json'}
+		payload = '{"causal-context": {}}'
+
+		res = requests.put(endpoint, data=payload, headers=headers)
+		if res.ok:
+			json_res = res.json()
+			print(json_res)
+		else:
+			json_res = res.json()
+			print(json_res)
 
 	def test_update_existing_key(self):
 		pass

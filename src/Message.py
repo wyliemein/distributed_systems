@@ -1,3 +1,9 @@
+from flask import Flask, request, jsonify, make_response
+import json
+import os
+import requests
+import signal
+
 '''
 Defines routing methods including GET, PUT, DELETE, and a general FORWARD
 Defines causal objects and provides parsing methods
@@ -5,6 +11,26 @@ Defines causal objects and provides parsing methods
 class Router():
 	def __init__(self):
 		self.methods = ['GET', 'POST', 'DELETE']
+		self.timeout = 5
+
+	# -------------------------------------------------------------------------
+	def timeout(time):
+		# Register a function to raise a TimeoutError on the signal.
+		signal.signal(signal.SIGALRM, raise_timeout)
+		# Schedule the signal to be sent after ``time``.
+		signal.alarm(time)
+
+		try:
+			yield
+		except TimeoutError:
+			pass
+		finally:
+	        # Unregister the signal so it won't be triggered
+	        # if the timeout is not reached.
+			signal.signal(signal.SIGALRM, signal.SIG_IGN)
+
+	def raise_timeout(signum, frame):
+		raise TimeoutError
 
 	# -------------------------------------------------------------------------
 	def base(self, address, path):
@@ -16,41 +42,44 @@ class Router():
 	# -------------------------------------------------------------------------
 	def GET(self, address, path, query, forward):
 		
-		endpoint, header = self.base(address, path)
+		with self.timeout(self.timeout):
+			endpoint, header = self.base(address, path)
 
-		r = requests.get(endpoint, data=query, headers=header)
+			r = requests.get(endpoint, data=query, headers=header)
 
-		# we want content not response
-		if forward:
-			return make_response(r.content, r.status_code)
-		return r.content, r.status_code
+			# we want content not response
+			if forward:
+				return make_response(r.content, r.status_code)
+			return r.content, r.status_code
 
 
 	# -------------------------------------------------------------------------
 	def PUT(self, address, path, data, forward):
 		
-		endpoint, header = self.base(address, path)
+		with self.timeout(self.timeout):
+			endpoint, header = self.base(address, path)
 
-		if data == None:
-			data = request.get_json() 
-			data = json.dumps(data) 
+			if data == None:
+				data = request.get_json() 
+				data = json.dumps(data) 
 
-		r = requests.put(endpoint, data=data, headers=header)
+			r = requests.put(endpoint, data=data, headers=header)
 
-		if forward:
-			return make_response(r.content, r.status_code)
-		return r.content, r.status_code
+			if forward:
+				return make_response(r.content, r.status_code)
+			return r.content, r.status_code
 
 	# -------------------------------------------------------------------------
 	def DELETE(self, address, path, query, forward):
 		
-		endpoint, header = self.base(address, path)
+		with self.timeout(self.timeout):
+			endpoint, header = self.base(address, path)
 
-		r = requests.delete(endpoint, data=query, headers=header)
-		
-		if forward:
-			return make_response(r.content, r.status_code)
-		return r.content, r.status_code
+			r = requests.delete(endpoint, data=query, headers=header)
+			
+			if forward:
+				return make_response(r.content, r.status_code)
+			return r.content, r.status_code
 
 	# -------------------------------------------------------------------------
 	def FORWARD(self, address, method, path, query, data):
@@ -99,4 +128,3 @@ class Router():
 
 
 
-		
