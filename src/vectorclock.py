@@ -6,6 +6,14 @@ class VectorClock():
     
     vectorclock = {}
 
+    def __init__(self, vector=None):
+        if vector is None:
+            self.vector = {}
+        elif isinstance(vector, list):
+            self.vector = { key: val for key, val in enumerate(vector) }
+        else:
+            self.vector = dict(vector)
+
     def increment(self, index):
         self.vectorclock[index] = self.vectorclock[index] + 1
         return self
@@ -21,6 +29,7 @@ class VectorClock():
         for x, y in self.vectorclock.items():
             print(x, y)
     
+
 
 
 
