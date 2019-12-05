@@ -9,6 +9,7 @@ import os
 import requests
 from node import Node
 from Message import Router
+from vectorclock import VectorClock
 
 app = Flask(__name__)
 
@@ -222,8 +223,14 @@ if __name__ == '__main__':
 
 	app.run(host='0.0.0.0', port=13800, debug=True)
 
-
-
-
-
-
+'''
+vc = VectorClock()
+vc.appendShard("node1")
+vc.increment("node1")
+vc.appendShard("node2")
+vc.appendShard("node3")
+vc.increment("node3")
+vc.increment("node3")
+vc.printclock()
+print("done")
+'''
