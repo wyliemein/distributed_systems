@@ -49,6 +49,8 @@ class Test_API_endpoints(unittest.TestCase):
 		if res.ok:
 			json_res = res.json()
 			print(json_res)
+			success = (json_res['Message'] == 'Updated successfully' or json_res['Message'] == 'Added successfully')
+			self.assertTrue(success)
 		else:
 			json_res = res.json()
 			print(json_res)

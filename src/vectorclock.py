@@ -22,7 +22,7 @@ class VectorClock():
             print(x, y)
 
     # compare vc to self.vectorclock and return true if self.vc is > vc
-    def local_is_greater(vc):
+    def first_is_greater(vc1, vc2):
         pass
 
     def json_to_vc(self, json_vc):

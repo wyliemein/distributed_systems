@@ -186,7 +186,6 @@ def update_keys(keyName):
 			method = request.method
 			data = None
 
-			print('forwarding to replica', file=sys.stderr)
 			# forward request to replicas in key_shard shard
 			for replica in all_replicas:
 				try:

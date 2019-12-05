@@ -179,8 +179,9 @@ def update_keys(keyName):
 		if (key_shard == shard.shard_ID):
 			method = request.method
 			print('local operation', file=sys.stderr)
-			return local_operation(method, keyName)
+			return self.guarantee_causal_consistency(all_replicas, keyName, method)
 
+		# forward request to another shard
 		else:
 			path = '/kv-store/keys/'+keyName
 			method = request.method
@@ -254,6 +255,32 @@ internal endpoint to gossip/send state to all other replicas
 def shard_gossip():
 
 	all_replicas = shard.shard_replicas(shard.shard_ID)
+
+'''
+garantee causal consistency by messaging all replicas and checking vector clocks
+'''
+def guarantee_causal_consistency(all_replicas, keyName, method):
+	path = '/kv-store/internal/keys/'+keyName
+	RES = {'message':''}
+	max_VC = [0 for len(shard.nodes)]
+	
+	for replica in all_replicas:
+		try:
+			res = router.FORWARD(replica, method, path, keyName, data)
+			
+			# if respondes from replicates are not identical, check vector clocks
+			if res['message'] != RES['message']:
+				vc = shard.json_to_vc(res['causal-context'])
+				if shard.first_is_greater(vc, max_VC):
+					RES = res
+					max_VC = vc
+
+		except:
+			shard.handle_unresponsive_node(replica)
+			continue
+
+	# return causally consisten response
+	return RES
 
 '''
 perfrom operation on node's local key-store
