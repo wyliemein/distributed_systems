@@ -1,10 +1,4 @@
-#!/bin/sh
-
 # cp source files to build directory
-path=$(pwd)
-cd ..
-cd src/
-cp -R $PWD/* /$path
 
 docker stop node1
 docker rm node1

@@ -86,7 +86,7 @@ def get_shards():
 get state information for specific shard
 '''
 @app.route('/kv-store/shards/<id>', methods=['GET'])
-def get_shards():
+def get_shard():
 	pass
 
 '''
@@ -95,8 +95,9 @@ Before we re-shard, make sure new node is up
 '''
 @app.route('/kv-store/view-change', methods=['PUT'])
 def new_view():
+	pass
 
-	path = '/kv-store/internal/view-change'
+	'''path = '/kv-store/internal/view-change'
 	method = 'PUT'
 	data = request.get_json()
 	view = data.get('view')
@@ -128,14 +129,16 @@ def new_view():
 
 	json_res = json.dumps(response)
 
-	return json_res, 200
+	return json_res, 200'''
 
 '''
 get/put/delete key for shard
 '''
 @app.route('/kv-store/keys/<keyName>', methods=['GET', 'PUT', 'DELETE'])
 def update_keys(keyName):
+	pass
 
+	'''
 	# find the shard that is associated with this key
 	key_shard = shard.find_match(keyName)
 
@@ -150,6 +153,7 @@ def update_keys(keyName):
 		data = None
 
 		return router.FORWARD(key_shard, method, path, keyName, data)
+		'''
 
 '''
 all internal endpoints
@@ -165,31 +169,19 @@ def key_transfer(keyName):
 	return local_operation(method, keyName)
 
 '''
-Internal messaging endpoint so that we can determine if a client or 
-node is pinging us
-'''
-@app.route('/kv-store/internal/key-count', methods=['GET'])
-def internal_key_count():
-	key_count = shard.numberOfKeys()
-
-	return jsonify({
-				'key_count'     : key_count
-	}), 200
-
-'''
 internal endpoint for viewchange
 '''
 @app.route('/kv-store/internal/view-change', methods=['PUT'])
 def spread_view():
-	
-	view = (request.get_data().decode('utf8')).split(',')
+	pass
+	'''view = (request.get_data().decode('utf8')).split(',')
 	address, keys = shard.view_change(view)
 
 	return jsonify({
 			'new_view'     : view,
 			'ADDRESS'	   : address,
 			'keys' 		   : keys
-	}), 200
+	}), 200'''
 
 '''
 perfrom operation on node's local key-store

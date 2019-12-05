@@ -89,22 +89,10 @@ class Node(KV_store):
 		# may be expensive but will produce better distribution
 		return (hash_val % self.ring_edge)
 
-	def distribute(self, repl_factor, elements):
 
-		even_dict = {}
-		g_iter = 0
-		shard_num = 0
-		elements.sort()
-
-		while g_iter < len(elements):
-			if g_iter % repl_factor == 0 and g_iter != 0:
-				shard_num += 1
-
-			even_dict[elements[g_iter]] = shard_num
-			g_iter += 1
-
-		return even_dict
-
+	'''
+	evenly distribute nodes into num_shard buckets
+	'''
 	def even_distribution(self, repl_factor, nodes):
 
 		nodes.sort()

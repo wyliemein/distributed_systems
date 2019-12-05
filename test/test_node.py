@@ -58,14 +58,14 @@ class Test_Shard_Methods(unittest.TestCase):
 		view = [addr1, addr2, addr3, addr4]
 		shard = Node(router, addr1, view, repl_factor)
 		print(shard)
-		old_card = len(shard.nodes)
+		old_card = len(shard.P_SHARDS)
 		new_view = view.copy()
 		new_view.append(addr5)
 		new_view.append(addr6)
 
 		shard.view_change(new_view, repl_factor)
 
-		new_card = len(shard.nodes)
+		new_card = len(shard.P_SHARDS)
 		print(shard)
 		self.assertTrue(new_card>old_card)
 
@@ -75,12 +75,12 @@ class Test_Shard_Methods(unittest.TestCase):
 		shard = Node(router, addr1, view, repl_factor)
 		print(shard)
 
-		old_card = len(shard.nodes)
+		old_card = len(shard.P_SHARDS)
 		new_view = [addr1, addr2, addr3, addr4]
 
 		shard.view_change(new_view, repl_factor)
 
-		new_card = len(shard.nodes)
+		new_card = len(shard.P_SHARDS)
 		print(shard)
 		self.assertTrue(old_card>new_card)
 
