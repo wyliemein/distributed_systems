@@ -5,10 +5,11 @@ import sys
 class VectorClock():
     
     def __init__(self, vectorclock=None):
-        self.vectorclock = {}
         if vectorclock:
             for x in vectorclock.keys():
                  self.vectorclock[x] = 0
+        else:
+            self.vectorclock = {}
 
     def __repr__(self):
         return jsonify(self.vectorclock)
