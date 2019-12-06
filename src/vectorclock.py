@@ -4,8 +4,11 @@ import sys
 
 class VectorClock():
     
-    def __init__(self):
+    def __init__(self, vectorclock=None):
         self.vectorclock = {}
+        if vectorclock:
+            for x in vectorclock.keys():
+                 self.vectorclock[x] = 0
 
     def __repr__(self):
         return jsonify(self.vectorclock)
@@ -34,6 +37,7 @@ class VectorClock():
         self.vectorclock = t_vectorclock
 
     def after(self, clock):
+        # True if clock -> self
         if (len(self.vectorclock.items()) > len(clock.items())):
             return False
         if self == clock:
@@ -56,10 +60,7 @@ class VectorClock():
 
     def printclock(self):
         for x, y in self.vectorclock.items():
-            print(x, y)
-
-    
-    
+            print(x, y)    
 
 
 
