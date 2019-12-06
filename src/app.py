@@ -139,7 +139,7 @@ get/put/delete key for shard
 def update_keys(keyName):
 	pass
 
-	'''
+	
 	# find the shard that is associated with this key
 	key_shard = shard.find_match(keyName)
 
@@ -154,7 +154,6 @@ def update_keys(keyName):
 		data = None
 
 		return router.FORWARD(key_shard, method, path, keyName, data)
-		'''
 
 '''
 all internal endpoints

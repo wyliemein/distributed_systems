@@ -16,7 +16,6 @@ class Node(KV_store):
 	def __init__(self, router, address, view, replication_factor):
 		KV_store.__init__(self)
 		self.history = [('Initialized', datetime.now())]
-
 		self.ADDRESS = address
 		self.ring_edge = 691 if len(view) < 100 else 4127    # parameter for hash mod value
 		self.repl_factor = replication_factor
@@ -68,7 +67,7 @@ class Node(KV_store):
 		return self.P_SHARDS[self.shard_ID]
 
 	'''
-	Below are all key operations, these functions are used as a wraper for 
+	Below are all key operations, these functions are used as a wrapper for 
 	the key-value store to evaluate causal objects before actually writing
 	'''
 	def insert_key(self, key, value):
@@ -136,7 +135,6 @@ class Node(KV_store):
 	we need to be careful about wrap around case. If ring_val >= max_ring_val, return 0
 	'''
 	def find_shard(self, direction, ring_val):
-
 		if direction == 'predecessor':
 			v_shard = bisect_left(self.V_SHARDS, ring_val)
 			if v_shard:

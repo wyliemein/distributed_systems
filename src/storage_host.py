@@ -107,7 +107,7 @@ class KV_store():
                 "delete-key": {
                     "message"  : "Error in DELETE",
                     "error"    : "Key does not exist",
-                    "doesExist": false
+                    "doesExist": False
                 }
             }), 201
 
