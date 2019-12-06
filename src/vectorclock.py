@@ -47,8 +47,3 @@ class VectorClock():
     def json_to_vc(self, json_vc):
         pass
     
-
-
-
-
-    
