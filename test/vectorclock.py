@@ -1,25 +1,19 @@
 from flask import jsonify
-import json
+
 import sys
 
 class VectorClock():
     
-    def __init__(self, VC=None):
-        self.vectorclock = {}
-        if VC:
-            self.vectorclock = VC
+    def __init__(self, view=None, clock=None):
+        if view is not None:
+            self.vectorclock = {}
+            for key in view.items():
+                self.vectorclock[key] = 0
+        elif clock is not None:
+            self.vectorclock = clock
 
     def __repr__(self):
-        return jsonify(self.vectorclock)
-
-    def __str__(self):
-        return str(self.vectorclock)
-
-    def initialize(self, nodes):
-        for node in nodes:
-            self.vectorclock[node] = 0
-
-        return self
+        return self.vectorclock
 
     def increment(self, index):
         if index not in self.vectorclock:
@@ -44,34 +38,20 @@ class VectorClock():
         t_vectorclock[index] = t_vectorclock[index] + 1
         self.vectorclock = t_vectorclock
 
-    def after(self, clock):
-        # True if clock -> self
-        if (len(self.vectorclock.items()) > len(clock.vectorclock.items())):
+    def selfHappensBefore(self, other):
+        # IF SELF HAPPENS BEFORE OTHER -> TRUE
+        if (len(other.keys()) < len(self.vectorclock.keys())):
             return False
-        if self.vectorclock == clock.vectorclock:
+        if other == self.vectorclock:
             return False
-        for key, value in self.vectorclock.items():
-            if clock.vectorclock.get(key, 0) > value:
+        for key, value in self.vectorclock.keys():
+            if other[key] < value:
                 return False
         return True
     
     def returnClock(self):
-        return jsonify(self.vectorclock)
+        return self.vectorclock
     
-    def deleteShard(self, index):
-        del self.vectorclock[index]
-
-    def comparePosition(self, other, index):
-        if (other.vectorclock[index] >= self.vectorclock[index]):
-            return True
-        return False
-
-    def printclock(self):
-        for x, y in self.vectorclock.items():
-            print(x, y)    
-
-
-
-
-
-    
+    def appendShard(self, index):
+        if index not in self.vectorclock:
+            self.vectorclock[index] = 0
