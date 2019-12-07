@@ -11,7 +11,7 @@ from collections import OrderedDict
 from storage_host import KV_store
 from vectorclock import VectorClock
 from apscheduler.scheduler import Scheduler
-
+import random
 
 
 
@@ -334,17 +334,17 @@ class Node(KV_store):
 	def handle_unresponsive_node(self, node):
 		pass
 
-
 	def gossip_backoff(self):
 		return hash(self.ADDRESS) % 113
+
 
 	def gossip(self):
 		if (gossiping == False):
 			gossiping = True
 			replica_ip_addresses = self.shard_replicas(self.shard_ID)
-			replica_index = random(len(replica_ip_addresses)-1)
+			replica_index = random.randint(0,len(replica_ip_addresses)-1)
 			while (self.shard_ID == replica_index):
-				replica_index = random(len(replica_ip_addresses)-1)
+				replica_index = random.randint(0,len(replica_ip_addresses)-1)
 			replica = replica_ip_addresses[replica_index]
 			tiebreaker = replica if (replica_index > self.shard_ID) else self.ADDRESS
 			data = {

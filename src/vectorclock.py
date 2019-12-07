@@ -4,7 +4,6 @@ import sys
 
 class VectorClock():
     
-<<<<<<< HEAD
     def __init__(self, view=None, clock=None):
         if view is not None:
             self.vectorclock = {}
@@ -12,14 +11,6 @@ class VectorClock():
                 self.vectorclock[key] = 0
         elif clock is not None:
             self.vectorclock = clock
-=======
-    def __init__(self, vectorclock=None):
-        if vectorclock:
-            for x in vectorclock.keys():
-                 self.vectorclock[x] = 0
-        else:
-            self.vectorclock = {}
->>>>>>> cd2ee208ce4632f7a5546f94f01ede1807c20905
 
     def __repr__(self):
         return self.vectorclock
@@ -47,15 +38,9 @@ class VectorClock():
         t_vectorclock[index] = t_vectorclock[index] + 1
         self.vectorclock = t_vectorclock
 
-<<<<<<< HEAD
     def selfHappensBefore(self, other):
         # IF SELF HAPPENS BEFORE OTHER -> TRUE
         if (len(other.keys()) < len(self.vectorclock.keys())):
-=======
-    def after(self, clock):
-        # True if clock -> self
-        if (len(self.vectorclock.items()) > len(clock.items())):
->>>>>>> cd2ee208ce4632f7a5546f94f01ede1807c20905
             return False
         if other == self.vectorclock:
             return False
@@ -68,24 +53,5 @@ class VectorClock():
         return self.vectorclock
     
     def appendShard(self, index):
-<<<<<<< HEAD
         if index not in self.vectorclock:
             self.vectorclock[index] = 0
-=======
-        self.vectorclock[index] = 0
-
-    def comparePosition(self, other, index):
-        if (other[index] >= self.vectorclock[index]):
-            return True
-        return False
-
-    def printclock(self):
-        for x, y in self.vectorclock.items():
-            print(x, y)    
-
-
-
-
-
-    
->>>>>>> cd2ee208ce4632f7a5546f94f01ede1807c20905
