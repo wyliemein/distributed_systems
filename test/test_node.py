@@ -17,6 +17,16 @@ repl_factor = 2
 
 class Test_Shard_Methods(unittest.TestCase):
 
+	def test_insert_key(self):
+		print('test-1')
+		keyName = 'key1'
+		val = '1'
+		view = [addr1, addr2, addr3, addr4]
+		shard = Node(router, addr1, view, repl_factor)
+
+		res = shard.insertKey(keyName, val, False)
+		print('response:', res)
+
 	def test_initial_state(self):
 		print("test0\n")
 		view = [addr1, addr2, addr3, addr4]

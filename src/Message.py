@@ -1,3 +1,10 @@
+from flask import Flask, request, jsonify, make_response
+import json
+import os
+import requests
+import time
+#from wrapt_timeout_decorator import *
+
 '''
 Defines routing methods including GET, PUT, DELETE, and a general FORWARD
 Defines causal objects and provides parsing methods
@@ -5,85 +12,59 @@ Defines causal objects and provides parsing methods
 class Router():
 	def __init__(self):
 		self.methods = ['GET', 'POST', 'DELETE']
+		self.max_wait = 5
+		self.error_message = 'Timeout'
 
 	# -------------------------------------------------------------------------
 	def base(self, address, path):
 		ip_port = address.split(':')
 		endpoint = 'http://' + ip_port[0] + ':' + ip_port[1] + path
-		headers = {'content-type': 'application/json', 'Accept-Charset': 'UTF-8'}
+		headers = {'content-type': 'application/json'}
 		return endpoint, headers
 
 	# -------------------------------------------------------------------------
-	def GET(self, address, path, query, forward):
+	#@timeout(5, use_signals=False)
+	def GET(self, address, path, data):
 		
 		endpoint, header = self.base(address, path)
 
-		r = requests.get(endpoint, data=query, headers=header)
+		r = requests.get(endpoint, json=data, headers=header)
 
-		# we want content not response
-		if forward:
-			return make_response(r.content, r.status_code)
-		return r.content, r.status_code
+		return r.get_json(), r.status_code
 
 
 	# -------------------------------------------------------------------------
-	def PUT(self, address, path, data, forward):
+	#@timeout(5, use_signals=False)
+	def PUT(self, address, path, data):
 		
 		endpoint, header = self.base(address, path)
 
 		if data == None:
 			data = request.get_json() 
-			data = json.dumps(data) 
 
-		r = requests.put(endpoint, data=data, headers=header)
-
-		if forward:
-			return make_response(r.content, r.status_code)
-		return r.content, r.status_code
+		r = requests.put(endpoint, json=data, headers=header)
+		return r.get_json(), r.status_code
 
 	# -------------------------------------------------------------------------
-	def DELETE(self, address, path, query, forward):
+	#@timeout(5, use_signals=False)
+	def DELETE(self, address, path, data):
 		
 		endpoint, header = self.base(address, path)
 
-		r = requests.delete(endpoint, data=query, headers=header)
+		r = requests.delete(endpoint, json=data, headers=header)
 		
 		if forward:
 			return make_response(r.content, r.status_code)
-		return r.content, r.status_code
+		return r.get_json(), r.status_code
 
 	# -------------------------------------------------------------------------
-	def FORWARD(self, address, method, path, query, data):
-		
-		forward = False
-
-		if method == 'GET':
-			res, status_code = self.GET(address, path, query, forward)
-			r_dict = json.loads(res.decode('utf-8'))
-			if 'get-key' in r_dict:
-				r_dict['get-key']['address'] = address
-
-		elif method == 'PUT':
-			res, status_code =  self.PUT(address, path, data, forward)
-			r_dict = json.loads(res.decode('utf-8'))
-			if 'insert-key' in r_dict:
-				r_dict['insert-key']['address'] = address
-			elif 'update-key' in r_dict:
-				r_dict['update-key']['address'] = address
-
-		elif method == 'DELETE':
-			res, status_code = self.DELETE(address, path, query, forward)
-			r_dict = json.loads(res.decode('utf-8'))
-			if 'delete-key' in r_dict:
-				r_dict['delete-key'] = address
-
-		else:
-			return jsonify({
-				'error'     : 'invalid requests method',
-				'message'   : 'Error in exec_op'
-			}), 400
-
-		return make_response(r_dict, status_code)
+	def FORWARD(self, address, method, path, data):
+		if method == "GET":
+			self.GET(address,path,data)
+		if method == "PUT":
+			self.PUT(address,path,data)
+		if method == "DELETE":
+			self.DELETE(address,path,data)
 
 
 
@@ -99,4 +80,5 @@ class Router():
 
 
 
-		
+
+

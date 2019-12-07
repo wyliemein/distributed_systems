@@ -5,19 +5,20 @@ and shard membership.
 
 import xxhash as hasher
 from bisect import bisect_right, bisect_left
-from storage_host import KV_store
 from datetime import datetime
 import json
 from collections import OrderedDict
+from storage_host import KV_store
+from vectorclock import VectorClock
 
 
 class Node(KV_store):
 	'''docstring for node class'''
 	def __init__(self, router, address, view, replication_factor):
-		KV_store.__init__(self)
+		KV_store.__init__(self, address)
 		self.history = [('Initialized', datetime.now())]
-
 		self.ADDRESS = address
+		self.VC = VectorClock().initialize(view)
 		self.ring_edge = 691 if len(view) < 100 else 4127    # parameter for hash mod value
 		self.repl_factor = replication_factor
 		self.num_shards = 0
@@ -64,21 +65,8 @@ class Node(KV_store):
 	'''
 	get all nodes in this shard
 	'''
-	def shard_replicas(self):
-		return self.P_SHARDS[self.shard_ID]
-
-	'''
-	Below are all key operations, these functions are used as a wraper for 
-	the key-value store to evaluate causal objects before actually writing
-	'''
-	def insert_key(self, key, value):
-		pass
-
-	def read_key(self, key):
-		pass
-
-	def delete_key(self, key):
-		pass
+	def shard_replicas(self, shard_ID):
+		return self.P_SHARDS[shard_ID]
 
 	'''
 	hash frunction is a composit of xxhash modded by prime
@@ -136,7 +124,6 @@ class Node(KV_store):
 	we need to be careful about wrap around case. If ring_val >= max_ring_val, return 0
 	'''
 	def find_shard(self, direction, ring_val):
-
 		if direction == 'predecessor':
 			v_shard = bisect_left(self.V_SHARDS, ring_val)
 			if v_shard:
@@ -158,17 +145,20 @@ class Node(KV_store):
 		2. add and/or remove nodes
 	'''
 	def view_change(self, view, repl_factor):
-
 		new_num_shards = len(view) // repl_factor
 		if new_num_shards == 1:
 			new_num_shards = 2
 
+		view.sort()
 		buckets = self.even_distribution(repl_factor, view)
 		#print('buckets', buckets)
 
 		# add nodes and shards
 		for node in view:
 			my_shard = buckets[node]
+
+			if node == self.ADDRESS:
+				self.shard_ID = buckets[node]
 
 			# add a new node
 			if node not in self.nodes:
@@ -208,7 +198,7 @@ class Node(KV_store):
 
 		# determine if the node's shard is this shard
 		if self.shard_ID == shard_ID:
-			print('<adding node to:', shard_ID)
+			#print('<adding node to:', shard_ID)
 			self.shard_keys()
 
 	'''
@@ -319,7 +309,18 @@ class Node(KV_store):
 	send final state of node before removing a node
 	'''
 	def final_state_transfer(self, node):
+		# for each replica 
+			# send state to each replica
+			# tell replicas to delete its position in their vector clock
 		return True
+
+	'''
+	handle node failures, check if node should be removed or not
+	'''
+	def handle_unresponsive_node(self, node):
+		pass
+
+
 
 
 

@@ -2,6 +2,8 @@ import unittest
 import collections
 from node import Node
 from Message import Router
+import requests
+import json
 
 # example node addresses
 addr1="10.10.0.2:13800"
@@ -16,7 +18,15 @@ class Test_API_endpoints(unittest.TestCase):
 	# simple system tests
 	# -------------------------------------------------------------------------
 	def test_get_key_count(self):
-		pass
+		port = addr1.split(':')[1]
+		endpoint = 'http://127.0.0.1:13802/kv-store/key-count'
+		headers = {'content-type': 'application/json'}
+		payload = '{"causal-context": {}}'
+
+		res = requests.get(endpoint, data=payload, headers=headers)
+		if res.ok:
+			json_res = res.json()
+			print('<key count is', json_res['key_count'], '>')
 
 	def test_get_ID_and_key_count(self):
 		pass
@@ -30,10 +40,35 @@ class Test_API_endpoints(unittest.TestCase):
 	# key operations
 	# -------------------------------------------------------------------------
 	def test_insert_new_key(self):
-		pass
+		port = addr1.split(':')[1]
+		endpoint = 'http://127.0.0.1:13802/kv-store/keys/sampleKey'
+		headers = {'content-type': 'application/json'}
+		payload = json.dumps({"value": "sampleValue", "causal-context": {}})
+
+		res = requests.put(endpoint, data=payload, headers=headers)
+		if res.ok:
+			json_res = res.json()
+			print(json_res)
+		else:
+			return False
 
 	def test_update_existing_key(self):
-		pass
+		port = addr1.split(':')[1]
+		endpoint = 'http://127.0.0.1:13802/kv-store/keys/sampleKey'
+		headers = {'content-type': 'application/json'}
+		payload = json.dumps({"value": "sampleValue", "causal-context": {}})
+
+		res = requests.put(endpoint, data=payload, headers=headers)
+		if res.ok:
+			res = res = requests.put(endpoint, data=payload, headers=headers)
+			if res.ok:
+				json_res = res.json()
+				print(json_res)
+			else:
+				return False
+
+		else:
+			return False
 
 	def test_read_existing_key(self):
 		pass
