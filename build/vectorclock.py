@@ -21,20 +21,20 @@ class VectorClock():
         self.vectorclock[index] = self.vectorclock[index] + 1
 
     def merge(self, other, index):
-        if (len(self.vectorclock.items()) >= len(other.vectorclock.items())):
+        if (len(self.vectorclock.items()) >= len(other.items())):
             keys = self.vectorclock.keys()
         else:
-            keys = other.vectorclock.keys()
+            keys = other.keys()
         t_vectorclock = {} 
         for k in keys:
             if k not in self.vectorclock.keys():
                 self.vectorclock[k] = 0
-            if k not in other.vectorclock.keys():
-                other.vectorclock[k] = 0
-            if (self.vectorclock[k] >= other.vectorclock[k]):
+            if k not in other.keys():
+                other[k] = 0
+            if (self.vectorclock[k] >= other[k]):
                 t_vectorclock[k] = self.vectorclock[k]
             else:
-                t_vectorclock[k] = other.vectorclock[k]
+                t_vectorclock[k] = other[k]
         t_vectorclock[index] = t_vectorclock[index] + 1
         self.vectorclock = t_vectorclock
 
@@ -44,8 +44,14 @@ class VectorClock():
             return False
         if other == self.vectorclock:
             return False
-        for key, value in self.vectorclock.keys():
+        for key, value in self.vectorclock.items():
             if other[key] < value:
+                return False
+        return True
+
+    def allFieldsZero(self):
+        for key,value in self.vectorclock.items():
+            if value != 0:
                 return False
         return True
     

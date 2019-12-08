@@ -384,7 +384,6 @@ def local_operation(method, keyName, data, commit):
 		'error occured'
 
 '''
-<<<<<<< HEAD
 run the servers and extract instance metadata
 '''
 if __name__ == '__main__':
@@ -400,8 +399,6 @@ if __name__ == '__main__':
 	shard = Node(router, ADDRESS, VIEW, REPL_FACTOR)
 
 	app.run(host='0.0.0.0', port=13800, debug=False)
-=======
->>>>>>> eae6962849f082c44fa0ea89e0d9fecbf9e16f04
 
 
 

@@ -34,23 +34,23 @@ class Test_API_endpoints(unittest.TestCase):
 	def test_get_ID_and_key_count(self):
 		pass
 
-	def test_get_shard_info(self):
+	'''def test_get_shard_info(self):
 		shard_ID = 0
 		endpoint = 'http://127.0.0.1:13802/kv-store/shards/0'
 		headers = {'content-type': 'application/json'}
 		payload = json.dumps({"causal-context": {}})
 
 		res = requests.get(endpoint, data=payload, headers=headers)
-		print(res)
+		print(res)'''
 
 	def test_view_change(self):
 		pass
 
 	# key operations
 	# -------------------------------------------------------------------------
-	'''def test_insert_new_key(self):
+	def test_insert_new_key(self):
 		port = addr1.split(':')[1]
-		endpoint = 'http://127.0.0.1:13802//kv-store/keys/sampleKey'
+		endpoint = 'http://0.0.0.0:13802//kv-store/keys/sampleKey'
 		headers = {'content-type': 'application/json'}
 		payload = json.dumps({"value": "sampleValue", "causal-context": {}})
 
@@ -59,8 +59,8 @@ class Test_API_endpoints(unittest.TestCase):
 			json_res = res.json()
 			print(json_res)
 		else:
-			print(res.content)
-			return False'''
+			print(res)
+			return False
 
 	'''def test_update_existing_key(self):
 		port = addr1.split(':')[1]
