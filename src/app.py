@@ -3,7 +3,7 @@ app.py defines the network nodes that listen to requests from
 clients and other nodes int the system.
 '''
 
-from flask import Flask, request, jsonify, make_response
+from flask import Flask, request, jsonify, make_response, g
 import json
 import os
 import requests
@@ -13,6 +13,21 @@ import sys
 from vectorclock import VectorClock
 
 app = Flask(__name__)
+
+if __name__ == '__main__':
+
+	# exract view and ip
+	VIEW_STR = os.environ['VIEW']
+	VIEW = VIEW_STR.split(',')
+	ADDRESS = os.environ['ADDRESS']
+	REPL_FACTOR = int(os.environ['REPL_FACTOR'])
+
+	# create node and message router
+	router = Router()
+	shard = Node(router, ADDRESS, VIEW, REPL_FACTOR)
+
+	app.run(host='0.0.0.0', port=13800, debug=False)
+
 
 @app.route('/')
 def root():
@@ -173,8 +188,24 @@ def update_keys(keyName):
 	# we have the key locally
 	if (key_shard == shard.shard_ID):
 		method = request.method
-		print('return local key op', file=sys.stderr)
-		return causal_consistency(all_replicas, keyName, method)
+
+		shard.VC.increment(shard.ADDRESS)
+		if method == 'PUT':
+			data = request.get_json()
+			value = data["value"]
+			response, code = shard.insertKey(keyName, value, shard.VC, ADDRESS if (forward is not None) else None)
+			if (code == 200):
+				share_request("PUT", keyName, data)
+			return response, code
+		elif method == 'GET':
+			return shard.readKey(keyName, shard.VC, ADDRESS if (forward is not None) else None)
+		elif method == 'DELETE':
+			response, code = shard.removeKey(keyName, shard.VC, ADDRESS if (forward is not None) else None)
+			if (code == 200):
+				share_request("DELETE", keyName, data)
+			return response, code
+		else:
+			'error occured'
 
 	# forward request to another shard
 	else:
@@ -200,6 +231,17 @@ def update_keys(keyName):
 			return jsonify({"error":"Unable to satisfy request","message":"Error in DELETE"}), 503
 
 
+def share_request(method ,key, data=None):
+	headers = {'content-type': 'application/json'}
+	replica_ip_addresses = shard.shard_replicas(shard.shard_ID)
+	if method == "DELETE":
+		for replica in replica_ip_addresses:
+			if (replica != ADDRESS):
+				requests.delete(replica + '/kv-store/keys/' + key, headers=headers, timeout=0.00001)
+	elif method == "PUT":
+		for replica in replica_ip_addresses:
+			if (replica != ADDRESS):
+				requests.put(replica + '/kv-store/keys/' + key, json=data, headers=headers, timeout=0.00001)
 '''
 all internal endpoints
 ---------------------------------------------------------------------------------
@@ -260,72 +302,57 @@ def spread_view():
 			'keys' 		   : shard.numberOfKeys
 	}), 200
 
+@app.route('/kv-store/internal/state-transfer', methods=['PUT'])
+def state_transfer():
+	data = request.get_json()
+	other_vector_clock = data["context"]
+	if shard.VC.selfHappensBefore(other_vector_clock):
+		shard.keystore = data["kv-store"]
+		shard.vc = VectorClock(view=None, clock=other_vector_clock)
+	return {
+			"message"	: "Acknowledged"
+	}, 201
+
 '''
 internal endpoint to gossip/send state to all other replicas
 '''
 @app.route('/kv-store/internal/gossip', methods=['PUT'])
 def shard_gossip():
 
-	all_replicas = shard.shard_replicas(shard.shard_ID)
-
-'''
-garantee causal consistency by messaging all replicas and checking vector clocks
-'''
-def causal_consistency(all_replicas, keyName, method):
-	print('in two_phase_causal_consistency', file=sys.stderr)
-
-
-	data = request.get_json() 
-	request_vc = VectorClock(data['causal-context'])
-
-	print('clients causal-context:', request_vc, file=sys.stderr)
-
-	RES = local_operation(method, keyName, data, commit)
-	causal_king = shard.ADDRESS
-	max_VC = shard.VC
-	
-	# choose the causally greatest response
-	for replica in all_replicas:
-		if replica == shard.ADDRESS:
-			continue
-		try:
-			print('sending request to', replica, file=sys.stderr)
-
-			data['commit'] = commit
-			payload = json.dumps(data)
-			shard.VC.increment(shard.ADDRESS)
-			
-			forward = False
-			res, status_code = router.FORWARD(replica, method, path, keyName, payload, forward)
-
-			Jres = json.loads(RES)
-
-			# if respondes from replicates are not identical, check vector clocks
-			if res['message'] != Jres['message']:
-
-				vc = VectorClock(res['causal-context'])
-
-				print('comparing vector clocks', file=sys.stderr)
-				print('VC1', max_VC, file=sys.stderr)
-				print('VC2', vc, file=sys.stderr)
-
-				if max_VC.after(vc):
-					RES = res
-					max_VC = vc
-					causal_king = replica
-
-		except:
-			print('<Warning:', replica, 'is unresponsive', file=sys.stderr)
-			continue
-
-	# phase 2, commit request
-	commit = True
-	forward = True
-	if causal_king == shard.ADDRESS:
-		return local_operation(method, keyName, data, commit)
-	else:
-		payload['commit'] = commit
-		return router.FORWARD(replica, method, path, keyName, payload, forward)
+@app.route('/kv-store/internal/gossisp/', methods=["PUT"])
+def gossip():
+	data = request.get_json()
+	# checks if I am currently gossiping with someone else
+	if not shard.gossiping:
+		# causal context of the incoming node trying to gossip
+		other_context = data["context"]
+		# key store of incoming node trying to gossip
+		other_kvstore = data["kv-store"]
+		# this is true if the other node determined i will be the tiebreaker
+		tiebreaker = True if data["tiebreaker"] == ADDRESS else False
+		if shard.VC.selfHappensBefore(other_context):
+			# I am before
+			# i accept your data
+			shard.keystore = other_kvstore
+			shard.vc = VectorClock(None, other_context)
+			return {
+				"message"	: "I took your data"
+			}, 200
+		elif tiebreaker:
+			return {
+					"message" : "I am the tiebreaker, take my data",
+					"context" : shard.VC.__repr__,
+					"kv-store": shard.keystore,
+				}, 501
+		elif not tiebreaker:
+			shard.keystore = other_kvstore
+			shard.vc = VectorClock(None, other_context)
+			return {
+				"message"	: "I took your data"
+			}, 200
+		return {
+			"message"	: "I am gossiping with someone else",
+		}, 400
 
 '''
 perfrom operation on node's local key-store
@@ -363,7 +390,6 @@ if __name__ == '__main__':
 	shard = Node(router, ADDRESS, VIEW, REPL_FACTOR)
 
 	app.run(host='0.0.0.0', port=13800, debug=False)
-
 
 
 

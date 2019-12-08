@@ -11,8 +11,9 @@ from collections import OrderedDict
 from storage_host import KV_store
 from vectorclock import VectorClock
 from apscheduler.scheduler import Scheduler
+import random
 
-class Node(KV_store, VectorClock):
+class Node(KV_store):
 	'''docstring for node class'''
 	def __init__(self, router, address, view, replication_factor):
 		self.gossiping = False
@@ -32,6 +33,7 @@ class Node(KV_store, VectorClock):
 		self.V_SHARDS = [] # store all virtual shards
 		self.P_SHARDS = [[] for i in range(0, self.num_shards)] # map physical shards to nodes
 		self.virtual_translation = {} # map virtual shards to physical shards
+		self.backoff_mod = 113
    
 		self.router = router
 		self.view_change(view, replication_factor)
@@ -333,16 +335,22 @@ class Node(KV_store, VectorClock):
 					return True
 		return False
 
+	'''
+	handle node failures, check if node should be removed or not
+	'''
+	def handle_unresponsive_node(self, node):
+		pass
+
 	def gossip_backoff(self):
-		return hash(self.ADDRESS) % 113
+		return hash(self.ADDRESS) % self.backoff_mod
 
 	def gossip(self):
 		if (gossiping == False):
 			gossiping = True
 			replica_ip_addresses = self.shard_replicas(self.shard_ID)
-			replica_index = random(len(replica_ip_addresses)-1)
+			replica_index = random.randint(0,len(replica_ip_addresses)-1)
 			while (self.shard_ID == replica_index):
-				replica_index = random(len(replica_ip_addresses)-1)
+				replica_index = random.randint(0,len(replica_ip_addresses)-1)
 			replica = replica_ip_addresses[replica_index]
 			tiebreaker = replica if (replica_index > self.shard_ID) else self.ADDRESS
 			data = {

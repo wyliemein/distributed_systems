@@ -10,7 +10,13 @@ import json
 from collections import OrderedDict
 from storage_host import KV_store
 from vectorclock import VectorClock
+<<<<<<< HEAD
 from apscheduler.scheduler import Scheduler
+=======
+#from apscheduler.scheduler import Scheduler
+
+
+>>>>>>> da948057412dec6fe6d4b0133e72d57db7ff3d40
 
 class Node(KV_store, VectorClock):
 	'''docstring for node class'''
@@ -325,6 +331,16 @@ class Node(KV_store, VectorClock):
 					return True
 		return False
 
+<<<<<<< HEAD
+=======
+	'''
+	handle node failures, check if node should be removed or not
+	'''
+	def handle_unresponsive_node(self, node):
+		pass
+
+
+>>>>>>> da948057412dec6fe6d4b0133e72d57db7ff3d40
 	def gossip_backoff(self):
 		return hash(self.ADDRESS) % 113
 

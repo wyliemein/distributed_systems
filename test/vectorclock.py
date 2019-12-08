@@ -54,4 +54,8 @@ class VectorClock():
     
     def appendShard(self, index):
         if index not in self.vectorclock:
+<<<<<<< HEAD
             self.vectorclock[index] = 0
+=======
+            self.vectorclock[index] = 0
+>>>>>>> da948057412dec6fe6d4b0133e72d57db7ff3d40

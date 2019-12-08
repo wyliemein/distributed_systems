@@ -1,7 +1,6 @@
 import unittest
 import collections
-from node import Node
-from Message import Router
+#from Message import Router
 import requests
 import json
 
@@ -17,6 +16,7 @@ class Test_API_endpoints(unittest.TestCase):
 
 	# simple system tests
 	# -------------------------------------------------------------------------
+	'''
 	def test_get_key_count(self):
 		port = addr1.split(':')[1]
 		endpoint = 'http://127.0.0.1:13802/kv-store/key-count'
@@ -27,7 +27,8 @@ class Test_API_endpoints(unittest.TestCase):
 		if res.ok:
 			json_res = res.json()
 			print('<key count is', json_res['key_count'], '>')
-
+	'''
+	
 	def test_get_ID_and_key_count(self):
 		pass
 

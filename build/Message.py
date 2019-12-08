@@ -25,7 +25,11 @@ class Router():
 		return endpoint, headers
 
 	# -------------------------------------------------------------------------
+<<<<<<< HEAD
 	@timeout_decorator.timeout(max_wait, use_signals=False)
+=======
+	#@timeout(5, use_signals=False)
+>>>>>>> da948057412dec6fe6d4b0133e72d57db7ff3d40
 	def GET(self, address, path, data):
 		
 		endpoint, header = self.base(address, path)
@@ -36,7 +40,11 @@ class Router():
 
 
 	# -------------------------------------------------------------------------
+<<<<<<< HEAD
 	@timeout_decorator.timeout(max_wait, use_signals=False)
+=======
+	#@timeout(5, use_signals=False)
+>>>>>>> da948057412dec6fe6d4b0133e72d57db7ff3d40
 	def PUT(self, address, path, data):
 		
 		endpoint, header = self.base(address, path)
@@ -48,7 +56,11 @@ class Router():
 		return r.get_json(), r.status_code
 
 	# -------------------------------------------------------------------------
+<<<<<<< HEAD
 	@timeout_decorator.timeout(max_wait, use_signals=False)
+=======
+	#@timeout(5, use_signals=False)
+>>>>>>> da948057412dec6fe6d4b0133e72d57db7ff3d40
 	def DELETE(self, address, path, data):
 		
 		endpoint, header = self.base(address, path)
@@ -62,11 +74,24 @@ class Router():
 	# -------------------------------------------------------------------------
 	def FORWARD(self, address, method, path, data):
 		if method == "GET":
+<<<<<<< HEAD
 			return self.GET(address,path,data)
 		if method == "PUT":
 			return self.PUT(address,path,data)
 		if method == "DELETE":
 			return self.DELETE(address,path,data)
+=======
+			self.GET(address,path,data)
+		if method == "PUT":
+			self.PUT(address,path,data)
+		if method == "DELETE":
+			self.DELETE(address,path,data)
+
+
+
+
+
+>>>>>>> da948057412dec6fe6d4b0133e72d57db7ff3d40
 
 
 

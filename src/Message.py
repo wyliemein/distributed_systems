@@ -9,6 +9,7 @@ import timeout_decorator
 Defines routing methods including GET, PUT, DELETE, and a general FORWARD
 Defines causal objects and provides parsing methods
 '''
+
 max_wait = 5
 
 class Router():
@@ -54,9 +55,7 @@ class Router():
 		endpoint, header = self.base(address, path)
 
 		r = requests.delete(endpoint, json=data, headers=header)
-		
-		if forward:
-			return make_response(r.content, r.status_code)
+
 		return r.get_json(), r.status_code
 
 	# -------------------------------------------------------------------------
@@ -67,6 +66,7 @@ class Router():
 			return self.PUT(address,path,data)
 		if method == "DELETE":
 			return self.DELETE(address,path,data)
+
 
 
 
