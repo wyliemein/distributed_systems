@@ -1,0 +1,5 @@
+Our system implements consistent hashing of keys with shard replication.  
+We do this by mapping virtual shards to physical shards on each node in a  
+deterministic manner. We then implemented vector clocks for each node to  
+ensure causal consistency. In order to propage eventual consistency we  
+implemented a gossip protocol with random wake ups. 
