@@ -17,7 +17,7 @@ class Test_API_endpoints(unittest.TestCase):
 	# simple system tests
 	# -------------------------------------------------------------------------
 	
-	def test_get_key_count(self):
+	'''def test_get_key_count(self):
 		port = addr1.split(':')[1]
 		endpoint = 'http://127.0.0.1:13804/kv-store/key-count'
 		headers = {'content-type': 'application/json'}
@@ -28,14 +28,20 @@ class Test_API_endpoints(unittest.TestCase):
 			json_res = res.json()
 			print('<key count is', json_res['key_count'], '>')
 		else:
-			print(res)
+			print(res)'''
 	
 	
 	def test_get_ID_and_key_count(self):
 		pass
 
 	def test_get_shard_info(self):
-		pass
+		shard_ID = 0
+		endpoint = 'http://127.0.0.1:13802/kv-store/shards/0'
+		headers = {'content-type': 'application/json'}
+		payload = json.dumps({"causal-context": {}})
+
+		res = requests.get(endpoint, data=payload, headers=headers)
+		print(res)
 
 	def test_view_change(self):
 		pass
@@ -79,6 +85,7 @@ class Test_API_endpoints(unittest.TestCase):
 
 	def test_remove_existing_key(self):
 		pass
+
 
 	# more advanded tests
 	# -------------------------------------------------------------------------

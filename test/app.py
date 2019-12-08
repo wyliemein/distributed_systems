@@ -140,10 +140,10 @@ def get_shard():
 Change our current view and re-shard keys
 Before we re-shard, make sure new node is up 
 '''
-@app.route("/kv-store/view-change", methods=['PUT', 'GET'])
+@app.route("/kv-store/view-change", methods=['PUT'])
 def new_view():
 
-	#print('endpoint hit', file=sys.stderr)
+	print('endpoint hit', file=sys.stderr)
 	return jsonify({
 		'test': 'test1'
 		}), 200
@@ -188,12 +188,9 @@ get/put/delete key for shard
 '''
 @app.route('/kv-store/keys/<keyName>', methods=['GET', 'PUT', 'DELETE'])
 def update_keys(keyName):
-	return jsonify({
-		'test': example
-		}), 200
 
 	# find the shard that is associated with this key
-	'''key_shard = shard.find_match(keyName)
+	key_shard = shard.find_match(keyName)
 	all_replicas = shard.shard_replicas(key_shard)
 
 	# we have the key locally
@@ -252,7 +249,7 @@ def share_request(method ,key, data=None):
 	elif method == "PUT":
 		for replica in replica_ip_addresses:
 			if (replica != ADDRESS):
-				requests.put(replica + '/kv-store/keys/' + key, json=data, headers=headers, timeout=0.00001)'''
+				requests.put(replica + '/kv-store/keys/' + key, json=data, headers=headers, timeout=0.00001)
 '''
 all internal endpoints
 ---------------------------------------------------------------------------------

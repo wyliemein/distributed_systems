@@ -133,28 +133,27 @@ def get_shards():
 get state information for specific shard
 '''
 @app.route('/kv-store/shards/<id>', methods=['GET'])
-def get_shard():
-	pass
+def get_shard(shard_ID):
+	replicas = shard.shard_replicas(shard_ID)
+
+	return jsonify({
+		'shard_ID': shard_ID,
+		'replicas': replicas
+		}), 200
 
 '''
 Change our current view and re-shard keys
 Before we re-shard, make sure new node is up 
 '''
-@app.route("/kv-store/view-change", methods=['PUT', 'GET'])
+@app.route("/kv-store/view-change", methods=['PUT'])
 def new_view():
 
-	#print('endpoint hit', file=sys.stderr)
-	return jsonify({
-		'test': 'test1'
-		}), 200
-
-	'''path = '/kv-store/internal/view-change'
+	path = '/kv-store/internal/view-change'
 	method = 'PUT'
 	data = request.get_json()
 
 	print('data:', data, file=sys.stderr)
 
-	keys = {}
 	all_nodes = shard.all_nodes()
 	for node in all_nodes:
 		if node == shard.ADDRESS:
@@ -176,11 +175,10 @@ def new_view():
 	response['view-change']['shards'] = {}
 	for shard in range(len(shard.P_SHARDS)):
 		response['view-change']['shards']['shard-id'] = shard
-		response['view-change']['shards']['key-count'] = keys[shard.P_SHARDS[shard][0]]
 		response['view-change']['shards']['replicas'] = shard.P_SHARDS[shard]
 
 	json_res = json.dumps(response)
-	return json_res, 200'''
+	return json_res, 200
 
 
 '''
