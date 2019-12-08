@@ -10,7 +10,7 @@ import json
 from collections import OrderedDict
 from storage_host import KV_store
 from vectorclock import VectorClock
-#from apscheduler.scheduler import Scheduler
+from apscheduler.scheduler import Scheduler
 
 
 

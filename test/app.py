@@ -3,7 +3,7 @@ app.py defines the network nodes that listen to requests from
 clients and other nodes int the system.
 '''
 
-from flask import Flask, request, jsonify, make_response
+from flask import Flask, request, jsonify, make_response, g
 import json
 import os
 import requests
@@ -13,6 +13,21 @@ import sys
 from vectorclock import VectorClock
 
 app = Flask(__name__)
+
+if __name__ == '__main__':
+
+	# exract view and ip
+	VIEW_STR = os.environ['VIEW']
+	VIEW = VIEW_STR.split(',')
+	ADDRESS = os.environ['ADDRESS']
+	REPL_FACTOR = int(os.environ['REPL_FACTOR'])
+
+	# create node and message router
+	router = Router()
+	shard = Node(router, ADDRESS, VIEW, REPL_FACTOR)
+
+	app.run(host='0.0.0.0', port=13800, debug=False)
+
 
 @app.route('/')
 def root():
@@ -152,11 +167,17 @@ def update_keys(keyName, forward):
 		if method == 'PUT':
 			data = request.get_json()
 			value = data["value"]
-			return shard.insertKey(keyName, value, shard.VC, ADDRESS if (forward is not None) else None)
+			response, code = shard.insertKey(keyName, value, shard.VC, ADDRESS if (forward is not None) else None)
+			if (code == 200):
+				share_request("PUT", keyName, data)
+			return response, code
 		elif method == 'GET':
 			return shard.readKey(keyName, shard.VC, ADDRESS if (forward is not None) else None)
 		elif method == 'DELETE':
-			return shard.removeKey(keyName, shard.VC, ADDRESS if (forward is not None) else None)
+			response, code = shard.removeKey(keyName, shard.VC, ADDRESS if (forward is not None) else None)
+			if (code == 200):
+				share_request("DELETE", keyName, data)
+			return response, code
 		else:
 			'error occured'
 	# forward request to another shard
@@ -179,6 +200,17 @@ def update_keys(keyName, forward):
 			return jsonify({"error":"Unable to satisfy request","message":"Error in DELETE"}), 503
 
 
+def share_request(method ,key, data=None):
+	headers = {'content-type': 'application/json'}
+	replica_ip_addresses = shard.shard_replicas(shard.shard_ID)
+	if method == "DELETE":
+		for replica in replica_ip_addresses:
+			if (replica != ADDRESS):
+				requests.delete(replica + '/kv-store/keys/' + key, headers=headers, timeout=0.00001)
+	elif method == "PUT":
+		for replica in replica_ip_addresses:
+			if (replica != ADDRESS):
+				requests.put(replica + '/kv-store/keys/' + key, json=data, headers=headers, timeout=0.00001)
 '''
 all internal endpoints
 ---------------------------------------------------------------------------------
@@ -278,6 +310,7 @@ def gossip():
 			"message"	: "I am gossiping with someone else",
 		}, 400
 
+
 '''
 # def two_phase_causal_consistency(all_replicas, keyName, method):
 # 	print('in two_phase_causal_consistency', file=sys.stderr)
@@ -335,20 +368,6 @@ def gossip():
 # 		return router.FORWARD(replica, method, path, keyName, payload, forward)
 
 '''
-
-if __name__ == '__main__':
-
-	# exract view and ip
-	VIEW_STR = os.environ['VIEW']
-	VIEW = VIEW_STR.split(',')
-	ADDRESS = os.environ['ADDRESS']
-	REPL_FACTOR = int(os.environ['REPL_FACTOR'])
-
-	# create node and message router
-	router = Router()
-	shard = Node(router, ADDRESS, VIEW, REPL_FACTOR)
-
-	app.run(host='0.0.0.0', port=13800, debug=False)
 
 
 

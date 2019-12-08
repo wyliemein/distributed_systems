@@ -3,12 +3,15 @@ import json
 import os
 import requests
 import time
-#from wrapt_timeout_decorator import *
+import timeout_decorator
 
 '''
 Defines routing methods including GET, PUT, DELETE, and a general FORWARD
 Defines causal objects and provides parsing methods
 '''
+
+max_wait = 5
+
 class Router():
 	def __init__(self):
 		self.methods = ['GET', 'POST', 'DELETE']
@@ -23,7 +26,7 @@ class Router():
 		return endpoint, headers
 
 	# -------------------------------------------------------------------------
-	#@timeout(5, use_signals=False)
+	@timeout_decorator.timeout(max_wait, use_signals=False)
 	def GET(self, address, path, data):
 		
 		endpoint, header = self.base(address, path)
@@ -34,7 +37,7 @@ class Router():
 
 
 	# -------------------------------------------------------------------------
-	#@timeout(5, use_signals=False)
+	@timeout_decorator.timeout(max_wait, use_signals=False)
 	def PUT(self, address, path, data):
 		
 		endpoint, header = self.base(address, path)
@@ -46,25 +49,23 @@ class Router():
 		return r.get_json(), r.status_code
 
 	# -------------------------------------------------------------------------
-	#@timeout(5, use_signals=False)
+	@timeout_decorator.timeout(max_wait, use_signals=False)
 	def DELETE(self, address, path, data):
 		
 		endpoint, header = self.base(address, path)
 
 		r = requests.delete(endpoint, json=data, headers=header)
-		
-		if forward:
-			return make_response(r.content, r.status_code)
+
 		return r.get_json(), r.status_code
 
 	# -------------------------------------------------------------------------
 	def FORWARD(self, address, method, path, data):
 		if method == "GET":
-			self.GET(address,path,data)
+			return self.GET(address,path,data)
 		if method == "PUT":
-			self.PUT(address,path,data)
+			return self.PUT(address,path,data)
 		if method == "DELETE":
-			self.DELETE(address,path,data)
+			return self.DELETE(address,path,data)
 
 
 

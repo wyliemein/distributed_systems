@@ -66,7 +66,7 @@ class KV_store():
             response["replaced"] = False
             response["message"] = "Added successfully"
             code = 200
-        return jsonify(response), code
+        return json.dumps(response), code
 
     def removeKey(self, key, context, address=None):
         response = {}
@@ -84,7 +84,7 @@ class KV_store():
             response["error"]   = "Key does not exist"
             response["doesExist"]= False
             code = 404
-        return jsonify(response), code
+        return json.dumps(response), code
 
     def readKey(self, key, context, address=None):
         response = {}
@@ -102,4 +102,4 @@ class KV_store():
             response["error"]   = "Key does not exist"
             response["doesExist"]= False
             code = 404
-        return jsonify(response), code
+        return json.dumps(response), code
