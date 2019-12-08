@@ -307,7 +307,11 @@ class Node(KV_store):
 		old_kv = self.KV_store
 		for replica in self.P_SHARDS[old_shard_ID]:
 			data = None
-			res, status_code = self.router.GET(replica, '/kv-store/internal/KV', data, False)
+
+			try:
+				res, status_code = self.router.GET(replica, '/kv-store/internal/KV', data, False)
+			except:
+				continue
 
 			if status_code == 201:
 				new_kv = res.get('KV_store')
@@ -332,7 +336,10 @@ class Node(KV_store):
 		replica_ip_addresses = self.shard_replicas(self.shard_ID)
 		for replica in replica_ip_addresses:
 			if (replica != self.ADDRESS):
-				res, status_code = self.router.PUT(replica, '/kv-store/internal/state-transfer', data, False)
+				try:
+					res, status_code = self.router.PUT(replica, '/kv-store/internal/state-transfer', data, False)
+				except:
+					continue
 				if status_code == 201:
 					return True
 		return False
@@ -362,8 +369,11 @@ class Node(KV_store):
 				"kv-store": current_key_store,
 				"tiebreaker": tiebreaker
 			}
-			print("sendingto node: " + replica + " " + str(data),file=sys.stderr)
-			response = self.router.PUT(replica,'/kv-store/internal/gossip/',json.dumps(data))
+			print("sending to node: " + replica + " " + str(data),file=sys.stderr)
+			try:
+				response = self.router.PUT(replica,'/kv-store/internal/gossip/',json.dumps(data))
+			except:
+				code = -1
 			code = response.status_code
 			
 			if (code == 200):

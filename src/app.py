@@ -127,7 +127,10 @@ def new_view():
 		if node == shard.ADDRESS:
 			continue
 
-		res = router.PUT(node, path, data)
+		try:
+			res = router.PUT(node, path, data)
+		except:
+			continue
 
 	shard.view_change(view, repl_factor)
 
