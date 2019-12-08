@@ -1,0 +1,5 @@
+Cody: Implemented consistent hashing, and shard membership
+Robert: Implemented gossip and key operations
+Gardner (Wylie): Implemented vector clocks and key operations
+
+Group Time: As a group in person we discussed the methodology we would implement and sort of all helped with each aspect of the final implementation.
