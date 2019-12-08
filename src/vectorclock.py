@@ -38,6 +38,22 @@ class VectorClock():
         t_vectorclock[index] = t_vectorclock[index] + 1
         self.vectorclock = t_vectorclock
 
+    ''' true if the other request is not from after my clock'''
+    def allowRead(self, other, index):
+        if index not in other:
+            return True
+        elif other[index] <= self.vectorclock[index]:
+            return True
+        return False
+    
+    def allowWrite(self, other, index):
+        if index not in other:
+            return True
+        elif other[index] <= self.vectorclock[index]:
+            return True
+        return False
+
+
     def selfHappensBefore(self, other):
         # IF SELF HAPPENS BEFORE OTHER -> TRUE
         if (len(other.keys()) < len(self.vectorclock.keys())):

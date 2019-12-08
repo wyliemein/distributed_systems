@@ -19,6 +19,7 @@ import sys
 class Node(KV_store):
 	'''docstring for node class'''
 	def __init__(self, router, address, view, replication_factor):
+		self.lastToGossip = False
 		self.gossiping = False
 		self.sched = Scheduler()
 		self.sched.start()
@@ -319,7 +320,7 @@ class Node(KV_store):
 	def final_state_transfer(self, node):
 		data = {
 				"kv-store": self.keystore,
-				"context": self.VC.__repr__() 
+				"causal-context": self.VC.__repr__() 
 		}
 		replica_ip_addresses = self.shard_replicas(self.shard_ID)
 		for replica in replica_ip_addresses:
@@ -338,9 +339,9 @@ class Node(KV_store):
 	def gossip_backoff(self):
 		return hash(self.ADDRESS) % random.randint(20,40)
 
-
 	def gossip(self):
-		if (self.gossiping == False):
+		if (self.gossiping == False) and (not self.lastToGossip):
+			self.lastToGossip = True
 			current_key_store = self.keystore
 			self.gossiping = True
 			replica_ip_addresses = self.shard_replicas(self.shard_ID)
@@ -351,46 +352,55 @@ class Node(KV_store):
 			otherNumber = int((replica.split(".")[3]).split(":")[0])
 			tiebreaker = replica if (otherNumber > myNumber) else self.ADDRESS
 			data = {
-				"context" : self.VC.__repr__(),
+				"causal-context" : self.VC.__repr__(),
 				"kv-store": current_key_store,
 				"tiebreaker": tiebreaker
 			}
-			print("sendingto node: " + replica + " " + str(data),file=sys.stderr)
 			response = self.router.PUT(replica,'/kv-store/internal/gossip/',json.dumps(data))
+			print("response: " + str(response.json()))
 			code = response.status_code
-			
-			if (code == 200):
-				# 200: They took my data 
-				self.gossiping = False
-			elif (code == 501):
-				content = response.json()
-				# 501: 
-				# the other node was either the tiebreaker or happened after self
-				# so this node takes its data
-				# context of node
-				other_context = content["context"]
-				# key store of incoming node trying to gossip
-				other_kvstore = content["kv-store"]
-				incoming_Vc = VectorClock(view=None, clock=other_context)
-				if bool(other_kvstore) and not incoming_Vc.allFieldsZero():
-					if current_key_store == self.keystore:
-						print("I TOOK DATA: " + str(self.keystore), file=sys.stderr)
-						self.VC.merge(other_context, self.ADDRESS)
-						self.keystore = other_kvstore
-					else:
-						print("I RECIEVED AN UPDATE WHILE GOSSIPING, ABORT", file=sys.stderr)
-				self.gossip = False
-				#self happened before other, take its kvstore and merge with my clock
-				# concurrent but other is tiebreaker
-			else:
-				# 400: Other is already gossiping with someone else
-				# ELSE: unresponsive node (maybe itll be code 404?)
-				self.gossiping = False
-		else:
-			# Curretly gossiping,
-			# Will call after gossip backoff again
+			if code == 200:
+				print("Took mine")
+				# other took mine
+			elif code == 201:
+				print("dIDNT WANT mine")
+				# other didnt want mine
 			self.gossiping = False
-		return 200
+		# 	if (code == 200):
+		# 		# 200: They took my data 
+		# 		self.gossiping = False
+		# 	elif (code == 501):
+		# 		content = response.json()
+		# 		# 501: 
+		# 		# the other node was either the tiebreaker or happened after self
+		# 		# so this node takes its data
+		# 		# context of node
+		# 		other_context = content["context"]
+		# 		# key store of incoming node trying to gossip
+		# 		other_kvstore = content["kv-store"]
+		# 		if self.VC.selfHappensBefore(other_context):
+		# 			self.VC.merge(other_context, self.ADDRESS)
+		# 			self.keystore = other_kvstore
+		# 		self.gossiping = False
+		# 		# incoming_Vc = VectorClock(view=None, clock=other_context)
+		# 		# if bool(other_kvstore) and not incoming_Vc.allFieldsZero():
+		# 		# 	if current_key_store == self.keystore:
+		# 		# 		print("I TOOK DATA: " + str(self.keystore), file=sys.stderr)
+						
+		# 		# 	else:
+		# 		# 		print("I RECIEVED AN UPDATE WHILE GOSSIPING, ABORT", file=sys.stderr)
+		# 		# self.gossip = False
+		# 		#self happened before other, take its kvstore and merge with my clock
+		# 		# concurrent but other is tiebreaker
+		# 	else:
+		# 		# 400: Other is already gossiping with someone else
+		# 		# ELSE: unresponsive node (maybe itll be code 404?)
+		# 		self.gossiping = False
+		# else:
+		# 	# Curretly gossiping,
+		# 	# Will call after gossip backoff again
+		# 	self.gossiping = False
+		# return 200
 
 
 

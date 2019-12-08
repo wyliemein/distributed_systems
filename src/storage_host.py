@@ -45,7 +45,7 @@ class KV_store():
     def insertKey(self, key, value, context, address=None):
         response = {}
         code = 0
-        response["context"] = context
+        response["causal-context"] = context
         if address is not None:
             response["address"] = address
         if (value is None):
@@ -71,7 +71,7 @@ class KV_store():
     def removeKey(self, key, context, address=None):
         response = {}
         code = 0
-        response["context"] = context
+        response["causal-context"] = context
         if address is not None:
             response["address"] = address
         if self.containsKey(key):
@@ -89,7 +89,7 @@ class KV_store():
     def readKey(self, key, context, address=None):
         response = {}
         code = 0
-        response["context"] = context
+        response["causal-context"] = context
         if address is not None:
             response["address"] = address
         if self.containsKey(key):

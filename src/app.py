@@ -141,11 +141,19 @@ def update_keys(keyName, forward):
 	key_shard = shard.find_match(keyName)
 	all_replicas = shard.shard_replicas(key_shard)
 	# we have the key locally
-	shard.VC.increment(shard.ADDRESS)
+	data = request.get_json()
+	read_permissions = False
+	write_permissions = False
+	if data is not None:
+		if "causal-context" in data:
+			read_permissions = shard.VC.allowRead(data["causal-context"],ADDRESS)
+			write_permissions = shard.VC.allowWrite(data["causal-context"],ADDRESS)	
 	if (key_shard == shard.shard_ID):
 		method = request.method
 		if method == 'PUT':
-			data = request.get_json()
+			if not write_permissions:
+				return jsonify({"error":"Unable to satisfy request","message":"Error in GET","causal-context": shard.VC.__repr__()}), 503
+			shard.VC.increment(shard.ADDRESS)
 			value = data["value"]
 			print(data, file=sys.stderr)
 			response, code = shard.insertKey(keyName, value, shard.VC.__repr__(), ADDRESS if (forward is not None) else None)
@@ -153,8 +161,13 @@ def update_keys(keyName, forward):
 			# 	share_request("PUT", keyName, data)
 			return response, code
 		elif method == 'GET':
+			if not read_permissions:
+				return jsonify({"error":"Unable to satisfy request","message":"Error in PUT","causal-context": shard.VC.__repr__()}), 503
 			return shard.readKey(keyName, shard.VC.__repr__(), ADDRESS if (forward is not None) else None)
 		elif method == 'DELETE':
+			if not write_permissions:
+				return jsonify({"error":"Unable to satisfy request","message":"Error in DELETE","causal-context": shard.VC.__repr__()}), 503
+			shard.VC.increment(shard.ADDRESS)
 			response, code = shard.removeKey(keyName, shard.VC.__repr__(), ADDRESS if (forward is not None) else None)
 			# if (code == 200):
 			# 	share_request("DELETE", keyName, data)
@@ -252,7 +265,7 @@ def spread_view():
 @app.route('/kv-store/internal/state-transfer', methods=['PUT'])
 def state_transfer():
 	data = request.get_json()
-	other_vector_clock = data["context"]
+	other_vector_clock = data["causal-context"]
 	if shard.VC.selfHappensBefore(other_vector_clock):
 		shard.keystore = data["kv-store"]
 		shard.vc = VectorClock(view=None, clock=other_vector_clock)
@@ -268,57 +281,80 @@ internal endpoint to gossip/send state to all other replicas
 def gossip():
 	# checks if I am currently gossiping with someone else
 	if not shard.gossiping:
+		shard.lastToGossip = False
 		incoming_data = json.loads(request.get_json())
 		shard.gossiping = True
 		# causal context of the incoming node trying to gossip
-		other_context = incoming_data["context"]
+		other_context = incoming_data["causal-context"]
 		# key store of incoming node trying to gossip
 		other_kvstore = incoming_data["kv-store"]
-		if other_kvstore == shard.keystore:
-			return jsonify({
-				"message": "We're equal."
-			}), 200
 		# this is true if the other node determined i will be the tiebreaker
 		tiebreaker = True if incoming_data["tiebreaker"] == ADDRESS else False
 		incoming_Vc = VectorClock(view=None, clock=other_context)
-		if shard.VC.selfHappensBefore(other_context):
-			# I am before
-			# i accept your data
+		if other_kvstore == shard.keystore:
+			shard.gossiping = False
+			return jsonify({
+				"message": "We're equal."
+			}), 201
+		elif incoming_Vc.allFieldsZero():
+			shard.gossiping = False
+			return jsonify({
+				"message" : "You dont have any data"
+			}), 201
+		elif incoming_Vc.selfHappensBefore(shard.VC.__repr__()):
+			# I am at least concurrent or after
+			shard.gossiping = False
+			return jsonify({
+				"message"	: "I Don't need yours."
+			}), 201
+		elif incoming_Vc.__repr__() != shard.VC.__repr__():
 			shard.keystore = other_kvstore
 			shard.VC.merge(other_context, ADDRESS)
 			shard.gossiping = False
-			print("I HAPPENED BEFORE, I TAKE YOU" + str(shard.keystore), file=sys.stderr)
 			return jsonify({
-				"message"	: "I took your data"
+				"message" : "I took your data"
 			}), 200
-		elif incoming_Vc.selfHappensBefore(shard.VC.__repr__()):
-			# I am after the incoming one, so return my data
-			shard.gossiping = False
-			return jsonify({
-					"message" : "I am after you, take my data",
-					"context" : shard.VC.__repr__(),
-					"kv-store": shard.keystore,
-				}), 501
-		elif tiebreaker:
-			shard.gossiping = False
-			return jsonify({
-					"message" : "I am the tiebreaker, take my data",
-					"context" : shard.VC.__repr__(),
-					"kv-store": shard.keystore,
-				}), 501
-		elif not tiebreaker:
-			if bool(other_kvstore) and not incoming_Vc.allFieldsZero():
-				shard.keystore = other_kvstore
-				shard.VC.merge(other_context, ADDRESS)
-				shard.gossiping = False
-				print("I DID NOT HAPPEN BEFORE BUT AM NOT THE TIEBREAKER" + str(shard.keystore), file=sys.stderr)
-				return jsonify({
-					"message"	: "I took your data"
-				}), 200
-	shard.gossiping = False
 	return jsonify({
-		"message"	: "I am gossiping with someone else"
-	}), 400
+		"message" : "gossiping"
+	}), 201
+	# 	if shard.VC.selfHappensBefore(other_context):
+	# 		# I am before
+	# 		# i accept your data
+	# 		shard.keystore = other_kvstore
+	# 		shard.VC.merge(other_context, ADDRESS)
+	# 		shard.gossiping = False
+	# 		print("I HAPPENED BEFORE, I TAKE YOU" + str(shard.keystore), file=sys.stderr)
+	# 		return jsonify({
+	# 			"message"	: "I took your data"
+	# 		}), 200
+	# 	elif incoming_Vc.selfHappensBefore(shard.VC.__repr__()):
+	# 		# I am after the incoming one, so return my data
+	# 		shard.gossiping = False
+	# 		return jsonify({
+	# 				"message" : "I am after you, take my data",
+	# 				"context" : shard.VC.__repr__(),
+	# 				"kv-store": shard.keystore,
+	# 			}), 501
+	# 	elif (shard.keystore != other_kvstore) and (tiebreaker):
+	# 		return jsonify({
+	# 				"message" : "I am the tiebreaker, take my data",
+	# 				"context" : shard.VC.__repr__(),
+	# 				"kv-store": shard.keystore,
+	# 			}), 501
+			
+	# 	# elif not tiebreaker:
+	# 	# 	if bool(other_kvstore) and not incoming_Vc.allFieldsZero():
+	# 	# 		shard.keystore = other_kvstore
+	# 	# 		shard.VC.merge(other_context, ADDRESS)
+	# 	# 		shard.gossiping = False
+	# 	# 		print("I DID NOT HAPPEN BEFORE BUT AM NOT THE TIEBREAKER" + str(shard.keystore), file=sys.stderr)
+	# 	# 		return jsonify({
+	# 	# 			"message"	: "I took your data"
+	# 	# 		}), 200
+	# shard.gossiping = False
+	# return jsonify({
+	# 	"message"	: "I am gossiping with someone else"
+	# }), 400
 
 
 '''
