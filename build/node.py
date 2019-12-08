@@ -11,7 +11,13 @@ from collections import OrderedDict
 from storage_host import KV_store
 from vectorclock import VectorClock
 from apscheduler.scheduler import Scheduler
+<<<<<<< HEAD
 import random
+=======
+
+
+
+>>>>>>> eae6962849f082c44fa0ea89e0d9fecbf9e16f04
 
 class Node(KV_store):
 	'''docstring for node class'''

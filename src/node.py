@@ -12,6 +12,7 @@ from storage_host import KV_store
 from vectorclock import VectorClock
 from apscheduler.scheduler import Scheduler
 import random
+import sys
 
 class Node(KV_store):
 	'''docstring for node class'''
@@ -167,7 +168,8 @@ class Node(KV_store):
 
 			if node == self.ADDRESS:
 				self.shard_ID = buckets[node]
-				#self.sched.add_interval_job(self.gossip, seconds=self.gossip_backoff())
+
+				self.sched.add_interval_job(self.gossip, seconds=self.gossip_backoff())
 
 			# add a new node
 			if node not in self.nodes:
@@ -342,27 +344,33 @@ class Node(KV_store):
 		pass
 
 	def gossip_backoff(self):
-		return hash(self.ADDRESS) % self.backoff_mod
+		return hash(self.ADDRESS) % random.randint(20,40)
 
 	def gossip(self):
-		if (gossiping == False):
-			gossiping = True
+		if (self.gossiping == False):
+			current_key_store = self.keystore
+			self.gossiping = True
 			replica_ip_addresses = self.shard_replicas(self.shard_ID)
-			replica_index = random.randint(0,len(replica_ip_addresses)-1)
-			while (self.shard_ID == replica_index):
-				replica_index = random.randint(0,len(replica_ip_addresses)-1)
-			replica = replica_ip_addresses[replica_index]
-			tiebreaker = replica if (replica_index > self.shard_ID) else self.ADDRESS
+			replica = replica_ip_addresses[(random.randint(0,len(replica_ip_addresses)-1))]
+			while (self.ADDRESS == replica):
+				replica = replica_ip_addresses[(random.randint(0,len(replica_ip_addresses)-1))]
+			myNumber = int((self.ADDRESS.split(".")[3]).split(":")[0])
+			otherNumber = int((replica.split(".")[3]).split(":")[0])
+			tiebreaker = replica if (otherNumber > myNumber) else self.ADDRESS
 			data = {
 				"context" : self.VC.__repr__(),
-				"kv-store": self.keystore,
+				"kv-store": current_key_store,
 				"tiebreaker": tiebreaker
 			}
-			content, code = self.router.PUT(replica,'/kv-store/internal/gossip/',data,False)
+			print("sendingto node: " + replica + " " + str(data),file=sys.stderr)
+			response = self.router.PUT(replica,'/kv-store/internal/gossip/',json.dumps(data))
+			code = response.status_code
+			
 			if (code == 200):
 				# 200: They took my data 
-				gossiping = False
+				self.gossiping = False
 			elif (code == 501):
+				content = response.json()
 				# 501: 
 				# the other node was either the tiebreaker or happened after self
 				# so this node takes its data
@@ -370,19 +378,26 @@ class Node(KV_store):
 				other_context = content["context"]
 				# key store of incoming node trying to gossip
 				other_kvstore = content["kv-store"]
-				self.VC = VectorClock(view=None, clock=other_context)
-				self.keystore = other_kvstore
+				incoming_Vc = VectorClock(view=None, clock=other_context)
+				if bool(other_kvstore) and not incoming_Vc.allFieldsZero():
+					if current_key_store == self.keystore:
+						print("I TOOK DATA: " + str(self.keystore), file=sys.stderr)
+						self.VC.merge(other_context, self.ADDRESS)
+						self.keystore = other_kvstore
+					else:
+						print("I RECIEVED AN UPDATE WHILE GOSSIPING, ABORT", file=sys.stderr)
+				self.gossip = False
 				#self happened before other, take its kvstore and merge with my clock
 				# concurrent but other is tiebreaker
 			else:
 				# 400: Other is already gossiping with someone else
 				# ELSE: unresponsive node (maybe itll be code 404?)
-				gossiping = False
+				self.gossiping = False
 		else:
 			# Curretly gossiping,
 			# Will call after gossip backoff again
-			gossiping = False
-
+			self.gossiping = False
+		return 200
 
 
 

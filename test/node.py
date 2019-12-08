@@ -13,6 +13,7 @@ from vectorclock import VectorClock
 from apscheduler.scheduler import Scheduler
 import random
 
+
 class Node(KV_store):
 	'''docstring for node class'''
 	def __init__(self, router, address, view, replication_factor):
@@ -343,6 +344,7 @@ class Node(KV_store):
 
 	def gossip_backoff(self):
 		return hash(self.ADDRESS) % self.backoff_mod
+
 
 	def gossip(self):
 		if (gossiping == False):

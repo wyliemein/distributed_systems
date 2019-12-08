@@ -3,6 +3,7 @@ import json
 import os
 import requests
 import time
+import sys
 
 '''
 Defines routing methods including GET, PUT, DELETE, and a general FORWARD
@@ -21,6 +22,7 @@ class Router():
 	def base(self, address, path):
 		ip_port = address.split(':')
 		endpoint = 'http://' + ip_port[0] + ':' + ip_port[1] + path
+		print(endpoint, file=sys.stderr)
 		headers = {'content-type': 'application/json'}
 		return endpoint, headers
 
@@ -31,7 +33,7 @@ class Router():
 
 		r = requests.get(endpoint, json=data, headers=header, timeout=max_wait)
 
-		return r.get_json(), r.status_code
+		return r
 
 
 	# -------------------------------------------------------------------------
@@ -43,7 +45,7 @@ class Router():
 			data = request.get_json() 
 
 		r = requests.put(endpoint, json=data, headers=header, timeout=max_wait)
-		return r.get_json(), r.status_code
+		return r
 
 	# -------------------------------------------------------------------------
 	def DELETE(self, address, path, data):
@@ -52,7 +54,7 @@ class Router():
 
 		r = requests.delete(endpoint, json=data, headers=header, timeout=max_wait)
 
-		return r.get_json(), r.status_code
+		return r
 
 	# -------------------------------------------------------------------------
 	def FORWARD(self, address, method, path, data):

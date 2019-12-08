@@ -3,7 +3,7 @@ app.py defines the network nodes that listen to requests from
 clients and other nodes int the system.
 '''
 
-from flask import Flask, request, jsonify, make_response
+from flask import Flask, request, jsonify, make_response, g
 import json
 import os
 import requests
@@ -362,6 +362,7 @@ def gossip():
 			"message"	: "I am gossiping with someone else",
 		}, 400'''
 
+
 '''
 perfrom operation on node's local key-store
 '''
@@ -383,6 +384,7 @@ def local_operation(method, keyName, data, commit):
 		'error occured'
 
 '''
+<<<<<<< HEAD
 run the servers and extract instance metadata
 '''
 if __name__ == '__main__':
@@ -398,6 +400,8 @@ if __name__ == '__main__':
 	shard = Node(router, ADDRESS, VIEW, REPL_FACTOR)
 
 	app.run(host='0.0.0.0', port=13800, debug=False)
+=======
+>>>>>>> eae6962849f082c44fa0ea89e0d9fecbf9e16f04
 
 
 
