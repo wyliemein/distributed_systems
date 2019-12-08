@@ -19,6 +19,6 @@ docker run --name="node1"        --net=kv_subnet     \
            --ip=10.10.0.2        -p 13802:13800      \
            -e ADDRESS="${addr1}"                     \
            -e REPL_FACTOR=2							 \
-           -e VIEW=${initial_full_view}              \
+           -e VIEW=${full_view}                      \
            kv-store:4.0
 

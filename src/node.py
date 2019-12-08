@@ -10,14 +10,18 @@ import json
 from collections import OrderedDict
 from storage_host import KV_store
 from vectorclock import VectorClock
-
+from apscheduler.scheduler import Scheduler
 
 class Node(KV_store, VectorClock):
 	'''docstring for node class'''
 	def __init__(self, router, address, view, replication_factor):
-		KV_store.__init__(self)
+		self.gossiping = False
+		self.sched = Scheduler()
+		self.sched.start()
+		KV_store.__init__(self, address)
 		self.history = [('Initialized', datetime.now())]
 		self.ADDRESS = address
+		self.VC = VectorClock(view=view, clock=None)
 		self.ring_edge = 691 if len(view) < 100 else 4127    # parameter for hash mod value
 		self.repl_factor = replication_factor
 		self.num_shards = 0
@@ -61,24 +65,14 @@ class Node(KV_store, VectorClock):
 	def all_shards(self):
 		return self.P_SHARDS
 
+	def all_nodes(self):
+		return self.nodes
+
 	'''
 	get all nodes in this shard
 	'''
 	def shard_replicas(self, shard_ID):
 		return self.P_SHARDS[shard_ID]
-
-	'''
-	Below are all key operations, these functions are used as a wrapper for 
-	the key-value store to evaluate causal objects before actually writing
-	'''
-	def insert_key(self, key, value):
-		pass
-
-	def read_key(self, key):
-		pass
-
-	def delete_key(self, key):
-		pass
 
 	'''
 	hash frunction is a composit of xxhash modded by prime
@@ -161,12 +155,17 @@ class Node(KV_store, VectorClock):
 		if new_num_shards == 1:
 			new_num_shards = 2
 
+		view.sort()
 		buckets = self.even_distribution(repl_factor, view)
 		#print('buckets', buckets)
 
 		# add nodes and shards
 		for node in view:
 			my_shard = buckets[node]
+
+			if node == self.ADDRESS:
+				self.shard_ID = buckets[node]
+				self.sched.add_interval_job(gossip, seconds=self.gossip_backoff())
 
 			# add a new node
 			if node not in self.nodes:
@@ -206,7 +205,7 @@ class Node(KV_store, VectorClock):
 
 		# determine if the node's shard is this shard
 		if self.shard_ID == shard_ID:
-			print('<adding node to:', shard_ID)
+			#print('<adding node to:', shard_ID)
 			self.shard_keys()
 
 	'''
@@ -287,20 +286,6 @@ class Node(KV_store, VectorClock):
 		self.P_SHARDS.pop(shard_ID)
 
 	'''
-	transfer keys from one shard to another
-	send keys from origin shard replicas to new shard replicas
-	'''
-	def keys_transfer(self):
-		for v in v_shards:
-
-			successor = self.find_shard('successor', v)
-			predecessor = self.find_shard('predecessor', v)
-
-			# if this node is the precessor a new v_shard, transfer keys over
-			if self.virtual_translation[predecessor] == self.shard_ID:
-				pass
-
-	'''
 	get all keys for a given shard
 	'''
 	def shard_keys(self):
@@ -311,24 +296,84 @@ class Node(KV_store, VectorClock):
 	concurrent operation: get new keys, send old keys, delete old keys
 	'''
 	def atomic_key_transfer(self, old_shard_ID, new_shard_ID, node):
-		return True
+		# message all nodes and tell them your state
+		# get new keys from new replica
+		self.final_state_transfer()
+
+		old_kv = self.KV_store
+		for replica in self.P_SHARDS[old_shard_ID]:
+			data = None
+			res, status_code = self.router.GET(replica, '/kv-store/internal/KV', data, False)
+
+			if status_code == 201:
+				new_kv = res.get('KV_store')
+				update = False
+				for key in new_kv:
+					self.KV_store.keystore[key] = new_kv[key]
+				for key in old_kv:
+					del self.KV_store.keystore[key]
+
+				return True
+			
+		return False
 
 	'''
 	send final state of node before removing a node
 	'''
 	def final_state_transfer(self, node):
-		return True
+		data = {
+				"kv-store": self.keystore,
+				"context": self.VC.__repr__() 
+		}
+		replica_ip_addresses = self.shard_replicas(self.shard_ID)
+		for replica in replica_ip_addresses:
+			if (replica != self.ADDRESS):
+				res, status_code = self.router.PUT(replica, '/kv-store/internal/state-transfer', data, False)
+				if status_code == 201:
+					return True
+		return False
 
-	'''
-	handle node failures, check if node should be removed or not
-	'''
-	def handle_unresponsive_node(self, node):
-		pass
+	def gossip_backoff(self):
+		return hash(self.ADDRESS) % 113
 
-
-
-
-
+	def gossip(self):
+		if (gossiping == False):
+			gossiping = True
+			replica_ip_addresses = self.shard_replicas(self.shard_ID)
+			replica_index = random(len(replica_ip_addresses)-1)
+			while (self.shard_ID == replica_index):
+				replica_index = random(len(replica_ip_addresses)-1)
+			replica = replica_ip_addresses[replica_index]
+			tiebreaker = replica if (replica_index > self.shard_ID) else self.ADDRESS
+			data = {
+				"context" : self.VC.__repr__(),
+				"kv-store": self.keystore,
+				"tiebreaker": tiebreaker
+			}
+			content, code = self.router.PUT(replica,'/kv-store/internal/gossip/',data,False)
+			if (code == 200):
+				# 200: They took my data 
+				gossiping = False
+			elif (code == 501):
+				# 501: 
+				# the other node was either the tiebreaker or happened after self
+				# so this node takes its data
+				# context of node
+				other_context = content["context"]
+				# key store of incoming node trying to gossip
+				other_kvstore = content["kv-store"]
+				self.VC = VectorClock(view=None, clock=other_context)
+				self.keystore = other_kvstore
+				#self happened before other, take its kvstore and merge with my clock
+				# concurrent but other is tiebreaker
+			else:
+				# 400: Other is already gossiping with someone else
+				# ELSE: unresponsive node (maybe itll be code 404?)
+				gossiping = False
+		else:
+			# Curretly gossiping,
+			# Will call after gossip backoff again
+			gossiping = False
 
 
 

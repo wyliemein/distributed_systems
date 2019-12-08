@@ -10,6 +10,7 @@ import requests
 from node import Node
 from Message import Router
 import sys
+from vectorclock import VectorClock
 
 app = Flask(__name__)
 
@@ -47,8 +48,11 @@ get number of keys for a node and stored replicas
 @app.route('/kv-store/key-count', methods=['GET'])
 def get_key_count():
 
-	#data = request.get_json()
-	#causal_obj = data.get('causal-context')
+	# update my vector clock
+	data = request.get_json()
+	causal_obj = data.get('causal-context')
+	#shard.VC.merge(causal_obj, shard.ADDRESS)
+
 	path = '/kv-store/internal/key-count'
 	all_replicas = shard.shard_replicas(shard.shard_ID) 
 	KEY_COUNT = my_key_count = shard.numberOfKeys()
@@ -59,27 +63,21 @@ def get_key_count():
 
 		# internal request
 		forward = False
-		data = None
+		payload = {'causal-context': shard.VC.vectorclock}
 
-		try:
-			res, status_code = router.GET(node, path, data, forward)
-		except:
-			# node may be down, handle it in node.py
-			print('<warning>', node, 'is unresponsive', file=sys.stderr)
-			shard.handle_unresponsive_node(node)
-			continue
+		res, status_code = router.PUT(node, path, json.dumps(payload), forward)
 
 		jsonResponse = json.loads(res.decode('utf-8'))
 		rep_key_count = (jsonResponse['key_count'])
-		rep_vector_clock = shard.json_to_vc(jsonResponse['VC'])
+		rep_vector_clock = shard.VC.json_to_vc(jsonResponse['causal-context'])
 
 		if my_key_count != rep_key_count:
-			if shard.local_is_greater(rep_vector_clock):
+			if shard.VC.after(rep_vector_clock):
 				# should use gossip protocol to let reps know latest state
 				pass
 			else:
 				KEY_COUNT = rep_key_count
-				# update my local state and use gossip protocol to let reps know latest state
+				# update my local state and use gossip protocol to let reps know latest state'''
 
 	return jsonify({
 				'key_count'     : KEY_COUNT
@@ -134,35 +132,33 @@ def new_view():
 	method = 'PUT'
 	data = request.get_json()
 	view = data.get('view')
-	forward = False
 
-	state = {}
-
-	# let all nodes know off the view change
-	all_nodes = view.split(',')
+	keys = {}
+	all_nodes = shard.all_nodes()
 	for node in all_nodes:
 		if node == shard.ADDRESS:
 			continue
 
-		res, status_code = router.PUT(node, path, view, forward)
+		res = router.PUT(node, method, path, view)
+
 		Response = json.loads(res.decode('utf-8'))
-		address = Response['ADDRESS']
 		keys = Response['keys']
-		state[address] = keys
+		keys[node] = keys
 
-	address, keys = shard.view_change(view.split(','))
-	state[address] = keys
-
+	shard.view_change(view)
+	keys[shard.ADDRESS] = shard.KV_Store.numberOfKeys()
+	
 	response = {}
-	response['view-change'] = {'message': 'View change successful', 'shards': []}
-
-	# format response
-	for address in state:
-		response['view-change']['shards'].append({'address': address, 'key-count': state[address]})
+	response['view-change'] = {"message": "View change successful", "causal-context":data.get('causal-context'), "shards": []}
+	response['view-change']['shards'] = {}
+	for shard in range(len(shard.P_SHARDS)):
+		response['view-change']['shards']['shard-id'] = shard
+		response['view-change']['shards']['key-count'] = keys[shard.P_SHARDS[shard][0]]
+		response['view-change']['shards']['replicas'] = shard.P_SHARDS[shard]
 
 	json_res = json.dumps(response)
-
 	return json_res, 200
+
 
 '''
 get/put/delete key for shard
@@ -170,41 +166,39 @@ get/put/delete key for shard
 @app.route('/kv-store/keys/<keyName>', methods=['GET', 'PUT', 'DELETE'])
 def update_keys(keyName):
 
-	try:
-		# find the shard that is associated with this key
-		key_shard = shard.find_match(keyName)
-		all_replicas = shard.shard_replicas(key_shard)
+	# find the shard that is associated with this key
+	key_shard = shard.find_match(keyName)
+	all_replicas = shard.shard_replicas(key_shard)
 
-		# we have the key locally
-		if (key_shard == shard.shard_ID):
-			method = request.method
-			print('local operation', file=sys.stderr)
-			return self.guarantee_causal_consistency(all_replicas, keyName, method)
+	# we have the key locally
+	if (key_shard == shard.shard_ID):
+		method = request.method
+		print('return local key op', file=sys.stderr)
+		return causal_consistency(all_replicas, keyName, method)
 
-		# forward request to another shard
+	# forward request to another shard
+	else:
+		path = '/kv-store/keys/'+keyName
+		method = request.method
+		data = None
+
+		# forward request to replicas in key_shard shard
+		for replica in all_replicas:
+			print('sending request to replica', replica, file=sys.stderr)
+			try:
+				return router.FORWARD(replica, method, path, keyName, data)
+			except:
+				shard.handle_unresponsive_node(replica)
+				continue
+
+		# we have gone through all replicas and none have responded
+		if method == 'PUT':
+			return jsonify({"error":"Unable to satisfy request","message":"Error in PUT"}), 503
+		elif method == 'GET':
+			return jsonify({"error":"Unable to satisfy request","message":"Error in GET"}), 503
 		else:
-			path = '/kv-store/keys/'+keyName
-			method = request.method
-			data = None
+			return jsonify({"error":"Unable to satisfy request","message":"Error in DELETE"}), 503
 
-			# forward request to replicas in key_shard shard
-			for replica in all_replicas:
-				try:
-					return router.FORWARD(replica, method, path, keyName, data)
-				except:
-					shard.handle_unresponsive_node(replica)
-					continue
-
-			# we have gone through all replicas and none have responded
-			if method == 'PUT':
-				return jsonify({"error":"Unable to satisfy request","message":"Error in PUT"}), 503
-			elif method == 'GET':
-				return jsonify({"error":"Unable to satisfy request","message":"Error in GET"}), 503
-			else:
-				return jsonify({"error":"Unable to satisfy request","message":"Error in DELETE"}), 503
-
-	except Exception as e:
-		print('caught exception in kv-store/keys\n', e, file=sys.stderr)
 
 '''
 all internal endpoints
@@ -214,24 +208,42 @@ all internal endpoints
 '''
 internal shard key count
 '''
-@app.route('/kv-store/internal/key-count', methods=['GET'])
+@app.route('/kv-store/internal/key-count', methods=['PUT'])
 def internal_key_count():
 
-	data = request.get_json()
-	causal_obj = data.get('causal-context')
+	causal_obj = json.dumps(shard.VC.vectorclock)
 	key_count = shard.numberOfKeys()
 
 	return jsonify({
-				'key_count'     : key_count
+				'key_count'     : key_count,
+				'causal-context': causal_obj
 	}), 200
 
 '''
 internal key transfer
 '''
 @app.route('/kv-store/internal/keys/<keyName>', methods=['GET', 'PUT', 'DELETE'])
-def key_transfer(keyName):
+def internal_keys(keyName):
+	#shard.VC.merge(causal_obj, shard.ADDRESS)
+
+	# update shard's vector clock, one for recieving and one for sending
+	shard.VC.increment(shard.ADDRESS)
+
 	method = request.method
-	return local_operation(method, keyName)
+	data = request.get_json()
+	data['causal-context'] = json.dumps(shard.VC.vectorclock)
+	commit = data.get('commit')
+	return local_operation(method, keyName, data, commit)
+
+'''
+get the entire KV store for a given node
+'''
+@app.route('/kv-store/internal/KV', methods=['GET'])
+def get_kv():
+	kv_res = json.dumps(self.KV_Store.keystore)
+	return jsonify({
+		'KV_Store' : kv_res
+		}), 201
 
 '''
 internal endpoint for viewchange
@@ -240,12 +252,12 @@ internal endpoint for viewchange
 def spread_view():
 
 	view = (request.get_data().decode('utf8')).split(',')
-	address, keys = shard.view_change(view)
+	shard.view_change(view)
 
 	return jsonify({
 			'new_view'     : view,
 			'ADDRESS'	   : address,
-			'keys' 		   : keys
+			'keys' 		   : shard.numberOfKeys
 	}), 200
 
 '''
@@ -259,49 +271,81 @@ def shard_gossip():
 '''
 garantee causal consistency by messaging all replicas and checking vector clocks
 '''
-def guarantee_causal_consistency(all_replicas, keyName, method):
-	path = '/kv-store/internal/keys/'+keyName
-	RES = {'message':''}
-	max_VC = [0 for len(shard.nodes)]
+def causal_consistency(all_replicas, keyName, method):
+	print('in two_phase_causal_consistency', file=sys.stderr)
+
+
+	data = request.get_json() 
+	request_vc = VectorClock(data['causal-context'])
+
+	print('clients causal-context:', request_vc, file=sys.stderr)
+
+	RES = local_operation(method, keyName, data, commit)
+	causal_king = shard.ADDRESS
+	max_VC = shard.VC
 	
+	# choose the causally greatest response
 	for replica in all_replicas:
+		if replica == shard.ADDRESS:
+			continue
 		try:
-			res = router.FORWARD(replica, method, path, keyName, data)
+			print('sending request to', replica, file=sys.stderr)
+
+			data['commit'] = commit
+			payload = json.dumps(data)
+			shard.VC.increment(shard.ADDRESS)
 			
+			forward = False
+			res, status_code = router.FORWARD(replica, method, path, keyName, payload, forward)
+
+			Jres = json.loads(RES)
+
 			# if respondes from replicates are not identical, check vector clocks
-			if res['message'] != RES['message']:
-				vc = shard.json_to_vc(res['causal-context'])
-				if shard.first_is_greater(vc, max_VC):
+			if res['message'] != Jres['message']:
+
+				vc = VectorClock(res['causal-context'])
+
+				print('comparing vector clocks', file=sys.stderr)
+				print('VC1', max_VC, file=sys.stderr)
+				print('VC2', vc, file=sys.stderr)
+
+				if max_VC.after(vc):
 					RES = res
 					max_VC = vc
+					causal_king = replica
+
 		except:
-			shard.handle_unresponsive_node(replica)
+			print('<Warning:', replica, 'is unresponsive', file=sys.stderr)
 			continue
 
-	# return causally consisten response
-	return RES
+	# phase 2, commit request
+	commit = True
+	forward = True
+	if causal_king == shard.ADDRESS:
+		return local_operation(method, keyName, data, commit)
+	else:
+		payload['commit'] = commit
+		return router.FORWARD(replica, method, path, keyName, payload, forward)
 
 '''
 perfrom operation on node's local key-store
 '''
-def local_operation(method, keyName):
+def local_operation(method, keyName, data, commit):
+	if commit:
+		shard.VC.increment(shard.ADDRESS)
 	
 	if method == 'PUT':
-		data = request.get_json()
 		value = data.get('value')
-		return shard.insert_key(keyName, value)
+		return shard.insertKey(keyName, value, False, shard.VC.vectorclock, commit)
 
 	elif method == 'GET':
-		return shard.read_key(keyName)
+		return shard.readKey(keyName, False, shard.VC.vectorclock, commit)
 
 	elif method == 'DELETE':
-		return shard.remove_key(keyName)
+		return shard.removeKey(keyName, False, shard.VC.vectorclock, commit)
 
 	else:
-		return jsonify({
-				'error'     : 'invalid requests method',
-				'message'   : 'Error in exec_op'
-		}), 400
+		'error occured'
 
 '''
 run the servers and extract instance metadata
@@ -318,5 +362,12 @@ if __name__ == '__main__':
 	router = Router()
 	shard = Node(router, ADDRESS, VIEW, REPL_FACTOR)
 
-	app.run(host='0.0.0.0', port=13800, debug=True)
+	app.run(host='0.0.0.0', port=13800, debug=False)
+
+
+
+
+
+
+
 

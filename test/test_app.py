@@ -43,20 +43,32 @@ class Test_API_endpoints(unittest.TestCase):
 		port = addr1.split(':')[1]
 		endpoint = 'http://127.0.0.1:13802/kv-store/keys/sampleKey'
 		headers = {'content-type': 'application/json'}
-		payload = '{"causal-context": {}}'
+		payload = json.dumps({"value": "sampleValue", "causal-context": {}})
 
 		res = requests.put(endpoint, data=payload, headers=headers)
 		if res.ok:
 			json_res = res.json()
 			print(json_res)
-			success = (json_res['Message'] == 'Updated successfully' or json_res['Message'] == 'Added successfully')
-			self.assertTrue(success)
 		else:
-			json_res = res.json()
-			print(json_res)
+			return False
 
 	def test_update_existing_key(self):
-		pass
+		port = addr1.split(':')[1]
+		endpoint = 'http://127.0.0.1:13802/kv-store/keys/sampleKey'
+		headers = {'content-type': 'application/json'}
+		payload = json.dumps({"value": "sampleValue", "causal-context": {}})
+
+		res = requests.put(endpoint, data=payload, headers=headers)
+		if res.ok:
+			res = res = requests.put(endpoint, data=payload, headers=headers)
+			if res.ok:
+				json_res = res.json()
+				print(json_res)
+			else:
+				return False
+
+		else:
+			return False
 
 	def test_read_existing_key(self):
 		pass
