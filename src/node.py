@@ -17,6 +17,7 @@ import sys
 class Node(KV_store):
 	'''docstring for node class'''
 	def __init__(self, router, address, view, replication_factor):
+		self.gossipScheduled = False
 		self.lastToGossip = False
 		self.gossiping = False
 		self.sched = Scheduler()
@@ -169,8 +170,9 @@ class Node(KV_store):
 
 			if node == self.ADDRESS:
 				self.shard_ID = buckets[node]
-
-				self.sched.add_interval_job(self.gossip, seconds=self.gossip_backoff())
+				if not self.gossipScheduled:
+					self.sched.add_interval_job(self.gossip, seconds=self.gossip_backoff())
+					self.gossipScheduled = True
 
 			# add a new node
 			if node not in self.nodes:
@@ -303,14 +305,14 @@ class Node(KV_store):
 	def atomic_key_transfer(self, old_shard_ID, new_shard_ID, node):
 		# message all nodes and tell them your state
 		# get new keys from new replica
-		self.final_state_transfer()
+		self.final_state_transfer(node)
 
-		old_kv = self.KV_store
+		old_kv = self.keystore
 		for replica in self.P_SHARDS[old_shard_ID]:
 			data = None
 
 			try:
-				res, status_code = self.router.GET(replica, '/kv-store/internal/KV', data, False)
+				res, status_code = self.router.GET(replica, '/kv-store/internal/KV', data)
 			except:
 				continue
 
@@ -338,7 +340,7 @@ class Node(KV_store):
 		for replica in replica_ip_addresses:
 			if (replica != self.ADDRESS):
 				try:
-					res, status_code = self.router.PUT(replica, '/kv-store/internal/state-transfer', data, False)
+					res, status_code = self.router.PUT(replica, '/kv-store/internal/state-transfer', data)
 				except:
 					continue
 				if status_code == 201:
@@ -352,10 +354,10 @@ class Node(KV_store):
 		pass
 
 	def gossip_backoff(self):
-		return hash(self.ADDRESS) % random.randint(20,40)
+		return hash(self.ADDRESS) % random.randint(5,15)
 
 	def gossip(self):
-		if (self.gossiping == False) and (not self.lastToGossip):
+		if (self.gossiping == False) and (not self.lastToGossip) and (self.repl_factor > 1):
 			self.lastToGossip = True
 			current_key_store = self.keystore
 			self.gossiping = True
@@ -371,18 +373,13 @@ class Node(KV_store):
 				"kv-store": current_key_store,
 				"tiebreaker": tiebreaker
 			}
-			print("sending to node: " + replica + " " + str(data),file=sys.stderr)
+			# code = 0
 			try:
 				response = self.router.PUT(replica,'/kv-store/internal/gossip/',json.dumps(data))
+				code = response.status_code
 			except:
 				code = -1
-			code = response.status_code
-			if code == 200:
-				print("Took mine")
-				# other took mine
-			elif code == 201:
-				print("dIDNT WANT mine")
-				# other didnt want mine
+				# code = -1
 			self.gossiping = False
 		# 	if (code == 200):
 		# 		# 200: They took my data 

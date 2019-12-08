@@ -15,6 +15,9 @@ class VectorClock():
     def __repr__(self):
         return self.vectorclock
 
+    def containsIndex(self, index):
+        return (index in self.vectorclock)
+
     def increment(self, index):
         if index not in self.vectorclock:
             self.vectorclock[index] = 0
@@ -40,18 +43,22 @@ class VectorClock():
 
     ''' true if the other request is not from after my clock'''
     def allowRead(self, other, index):
-        if index not in other:
-            return True
-        elif other[index] <= self.vectorclock[index]:
-            return True
-        return False
+        if bool(other):
+            if index not in other:
+                return True
+            elif other[index] <= self.vectorclock[index]:
+                return True
+            return False
+        return True
     
     def allowWrite(self, other, index):
-        if index not in other:
-            return True
-        elif other[index] <= self.vectorclock[index]:
-            return True
-        return False
+        if bool(other):
+            if index not in other:
+                return True
+            elif other[index] <= self.vectorclock[index]:
+                return True
+            return False
+        return True
 
 
     def selfHappensBefore(self, other):
@@ -61,7 +68,9 @@ class VectorClock():
         if other == self.vectorclock:
             return False
         for key, value in self.vectorclock.items():
-            if other[key] < value:
+            if (key not in other) and (value != 0):
+                return False
+            elif other[key] < value:
                 return False
         return True
 

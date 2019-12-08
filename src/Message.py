@@ -41,9 +41,6 @@ class Router():
 		
 		endpoint, header = self.base(address, path)
 
-		if data == None:
-			data = request.get_json() 
-
 		r = requests.put(endpoint, json=data, headers=header, timeout=max_wait)
 		return r
 

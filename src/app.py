@@ -23,12 +23,9 @@ get the current state of this node
 '''
 @app.route('/kv-store/state', methods=['GET'])
 def state():
-	state = shard.state_report()
-	str_state = json.dumps(state)
-	json_state = json.loads(str_state)
 	
 	return jsonify({
-				'node state:'     : json_state
+				'node state:'     : shard.__repr__()
 	}), 200
 
 '''
@@ -41,46 +38,18 @@ get number of keys for a node and stored replicas
 '''
 @app.route('/kv-store/key-count', methods=['GET'])
 def get_key_count():
-
-	# update my vector clock
-	data = request.get_json()
-	causal_obj = data.get('causal-context')
-	#shard.VC.merge(causal_obj, shard.ADDRESS)
-
-	path = '/kv-store/internal/key-count'
-	all_replicas = shard.shard_replicas(shard.shard_ID) 
-	KEY_COUNT = my_key_count = shard.numberOfKeys()
-
-	for node in all_replicas:
-		if node == shard.ADDRESS:
-			continue
-
-		# internal request
-		forward = False
-		payload = {'causal-context': shard.VC.vectorclock}
-
-		res = router.PUT(node, path, json.dumps(payload), forward)
-
-		jsonResponse = json.loads(res.decode('utf-8'))
-		rep_key_count = (jsonResponse['key_count'])
-		rep_vector_clock = shard.VC.json_to_vc(jsonResponse['causal-context'])
-
-		if my_key_count != rep_key_count:
-			if shard.VC.after(rep_vector_clock):
-				# should use gossip protocol to let reps know latest state
-				pass
-			else:
-				KEY_COUNT = rep_key_count
-				# update my local state and use gossip protocol to let reps know latest state'''
-
-	return jsonify({
-				'key_count'     : KEY_COUNT
-	}), 200
+	response = {
+		"message"       : "Key count retrieved successfully",
+        "key-count"     : shard.numberOfKeys(),
+        "shard-id"      : shard.shard_ID,
+        "causal-context": shard.VC.__repr__()
+	}
+	return json.dumps({"key-count" : response}), 200
 
 '''
 get shard ID and key count for each shard
 '''
-@app.route('/kv-store/shards/', defaults={'ID': None}, methods=['GET'])
+@app.route('/kv-store/shards', defaults={'ID': None}, methods=['GET'])
 @app.route('/kv-store/shards/<ID>', methods=['GET'])
 def shards(ID):
 
@@ -93,19 +62,19 @@ def shards(ID):
 		response['get-shard']['causal-context'] = {} #shard.VC.returnClock()
 		response['get-shard']['replicas'] = shard.shard_replicas(ID)
 
-		return jsonify(json.dumps(response)), 200
+		return json.dumps(response), 200
 
 	else:
 		response = {}
 		response['shard-membership'] = {}
 		response['shard-membership']['message'] = 'Shard membership retrieved successfully'
-		response['shard-membership']['causal-context'] = shard.VC.returnClock()
+		response['shard-membership']['causal-context'] = shard.VC.__repr__()
 		response['shard-membership']['shards'] = []
 
 		for shard_ID in range(len(shard.P_SHARDS)):
 			response['shard-membership']['shards'].append(shard_ID)
 
-		return jsonify(json.dumps(response)), 200
+		return json.dumps(response), 200
 
 '''
 Change our current view and re-shard keys
@@ -124,9 +93,9 @@ def new_view():
 	all_nodes = shard.all_nodes()
 
 	for node in all_nodes:
+		shard.VC.appendShard(node)
 		if node == shard.ADDRESS:
 			continue
-
 		try:
 			res = router.PUT(node, path, data)
 		except:
@@ -143,7 +112,7 @@ def new_view():
 	for shard_ID in range(len(shard.P_SHARDS)):
 		response['view-change']['shards'].append({'shard-id':shard_ID, 'replicas':shard.P_SHARDS[shard_ID]})
 
-	return jsonify(json.dumps(response)), 200
+	return json.dumps(response), 200
 
 '''
 get/put/delete key for shard
@@ -157,8 +126,8 @@ def update_keys(keyName, forward):
 	all_replicas = shard.shard_replicas(key_shard)
 	# we have the key locally
 	data = request.get_json()
-	read_permissions = False
-	write_permissions = False
+	read_permissions = True
+	write_permissions = True
 	if data is not None:
 		if "causal-context" in data:
 			read_permissions = shard.VC.allowRead(data["causal-context"],ADDRESS)
@@ -167,7 +136,7 @@ def update_keys(keyName, forward):
 		method = request.method
 		if method == 'PUT':
 			if not write_permissions:
-				return jsonify({"error":"Unable to satisfy request","message":"Error in GET","causal-context": shard.VC.__repr__()}), 503
+				return jsonify({"error":"Unable to satisfy request","message":"Error in PUT","causal-context": shard.VC.__repr__()}), 503
 			shard.VC.increment(shard.ADDRESS)
 			value = data["value"]
 			print(data, file=sys.stderr)
@@ -177,7 +146,7 @@ def update_keys(keyName, forward):
 			return response, code
 		elif method == 'GET':
 			if not read_permissions:
-				return jsonify({"error":"Unable to satisfy request","message":"Error in PUT","causal-context": shard.VC.__repr__()}), 503
+				return jsonify({"error":"Unable to satisfy request","message":"Error in GET","causal-context": shard.VC.__repr__()}), 503
 			return shard.readKey(keyName, shard.VC.__repr__(), ADDRESS if (forward is not None) else None)
 		elif method == 'DELETE':
 			if not write_permissions:
@@ -192,14 +161,13 @@ def update_keys(keyName, forward):
 	# forward request to another shard
 	else:
 		path = '/kv-store/keys/' +keyName + '/forward'
-		data = request.get_json()
 		# forward request to replicas in key_shard shard
 		forward_response = None
 		forward_code = 0
 		for replica in all_replicas:
 			if forward_response is None:
 				try:
-					response = router.FORWARD(replica, request.method, path, data)
+					response = router.FORWARD(replica, request.method, path, request.get_json())
 					return json.dumps(response.json()), response.status_code
 				except:
 					print("error unresponsive", file=sys.stderr)
@@ -251,7 +219,7 @@ get the entire KV store for a given node
 '''
 @app.route('/kv-store/internal/KV', methods=['GET'])
 def get_kv():
-	kv_res = json.dumps(self.KV_Store.keystore)
+	kv_res = json.dumps(shard.keystore)
 	return jsonify({
 		'KV_Store' : kv_res
 		}), 201
@@ -278,9 +246,9 @@ def state_transfer():
 	if shard.VC.selfHappensBefore(other_vector_clock):
 		shard.keystore = data["kv-store"]
 		shard.vc = VectorClock(view=None, clock=other_vector_clock)
-	return {
+	return jsonify({
 			"message"	: "Acknowledged"
-	}, 201
+	}), 201
 
 '''
 internal endpoint to gossip/send state to all other replicas
@@ -326,44 +294,6 @@ def gossip():
 	return jsonify({
 		"message" : "gossiping"
 	}), 201
-	# 	if shard.VC.selfHappensBefore(other_context):
-	# 		# I am before
-	# 		# i accept your data
-	# 		shard.keystore = other_kvstore
-	# 		shard.VC.merge(other_context, ADDRESS)
-	# 		shard.gossiping = False
-	# 		print("I HAPPENED BEFORE, I TAKE YOU" + str(shard.keystore), file=sys.stderr)
-	# 		return jsonify({
-	# 			"message"	: "I took your data"
-	# 		}), 200
-	# 	elif incoming_Vc.selfHappensBefore(shard.VC.__repr__()):
-	# 		# I am after the incoming one, so return my data
-	# 		shard.gossiping = False
-	# 		return jsonify({
-	# 				"message" : "I am after you, take my data",
-	# 				"context" : shard.VC.__repr__(),
-	# 				"kv-store": shard.keystore,
-	# 			}), 501
-	# 	elif (shard.keystore != other_kvstore) and (tiebreaker):
-	# 		return jsonify({
-	# 				"message" : "I am the tiebreaker, take my data",
-	# 				"context" : shard.VC.__repr__(),
-	# 				"kv-store": shard.keystore,
-	# 			}), 501
-			
-	# 	# elif not tiebreaker:
-	# 	# 	if bool(other_kvstore) and not incoming_Vc.allFieldsZero():
-	# 	# 		shard.keystore = other_kvstore
-	# 	# 		shard.VC.merge(other_context, ADDRESS)
-	# 	# 		shard.gossiping = False
-	# 	# 		print("I DID NOT HAPPEN BEFORE BUT AM NOT THE TIEBREAKER" + str(shard.keystore), file=sys.stderr)
-	# 	# 		return jsonify({
-	# 	# 			"message"	: "I took your data"
-	# 	# 		}), 200
-	# shard.gossiping = False
-	# return jsonify({
-	# 	"message"	: "I am gossiping with someone else"
-	# }), 400
 
 
 if __name__ == '__main__':
