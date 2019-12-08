@@ -27,7 +27,6 @@ class Router():
 		return endpoint, headers
 
 	# -------------------------------------------------------------------------
-	# @timeout_decorator.timeout(max_wait, use_signals=False)
 	def GET(self, address, path, data):
 		
 		endpoint, header = self.base(address, path)
@@ -38,7 +37,6 @@ class Router():
 
 
 	# -------------------------------------------------------------------------
-	# @timeout_decorator.timeout(max_wait, use_signals=False)
 	def PUT(self, address, path, data):
 		
 		endpoint, header = self.base(address, path)
@@ -50,7 +48,6 @@ class Router():
 		return r
 
 	# -------------------------------------------------------------------------
-	# @timeout_decorator.timeout(max_wait, use_signals=False)
 	def DELETE(self, address, path, data):
 		
 		endpoint, header = self.base(address, path)
@@ -67,10 +64,6 @@ class Router():
 			return self.PUT(address,path,data)
 		if method == "DELETE":
 			return self.DELETE(address,path,data)
-
-
-
-
 
 
 

@@ -3,7 +3,10 @@ import json
 import os
 import requests
 import time
+<<<<<<< HEAD
+=======
 import timeout_decorator
+>>>>>>> eae6962849f082c44fa0ea89e0d9fecbf9e16f04
 
 '''
 Defines routing methods including GET, PUT, DELETE, and a general FORWARD
@@ -26,18 +29,24 @@ class Router():
 		return endpoint, headers
 
 	# -------------------------------------------------------------------------
+<<<<<<< HEAD
+=======
 	@timeout_decorator.timeout(max_wait, use_signals=False)
+>>>>>>> eae6962849f082c44fa0ea89e0d9fecbf9e16f04
 	def GET(self, address, path, data):
 		
 		endpoint, header = self.base(address, path)
 
-		r = requests.get(endpoint, json=data, headers=header)
+		r = requests.get(endpoint, json=data, headers=header, timeout=max_wait)
 
 		return r.get_json(), r.status_code
 
 
 	# -------------------------------------------------------------------------
+<<<<<<< HEAD
+=======
 	@timeout_decorator.timeout(max_wait, use_signals=False)
+>>>>>>> eae6962849f082c44fa0ea89e0d9fecbf9e16f04
 	def PUT(self, address, path, data):
 		
 		endpoint, header = self.base(address, path)
@@ -45,16 +54,23 @@ class Router():
 		if data == None:
 			data = request.get_json() 
 
-		r = requests.put(endpoint, json=data, headers=header)
+		r = requests.put(endpoint, json=data, headers=header, timeout=max_wait)
 		return r.get_json(), r.status_code
 
 	# -------------------------------------------------------------------------
+<<<<<<< HEAD
+=======
 	@timeout_decorator.timeout(max_wait, use_signals=False)
+>>>>>>> eae6962849f082c44fa0ea89e0d9fecbf9e16f04
 	def DELETE(self, address, path, data):
 		
 		endpoint, header = self.base(address, path)
 
+<<<<<<< HEAD
+		r = requests.delete(endpoint, json=data, headers=header, timeout=max_wait)
+=======
 		r = requests.delete(endpoint, json=data, headers=header)
+>>>>>>> eae6962849f082c44fa0ea89e0d9fecbf9e16f04
 
 		return r.get_json(), r.status_code
 
@@ -66,10 +82,13 @@ class Router():
 			return self.PUT(address,path,data)
 		if method == "DELETE":
 			return self.DELETE(address,path,data)
+<<<<<<< HEAD
+=======
 
 
 
 
+>>>>>>> eae6962849f082c44fa0ea89e0d9fecbf9e16f04
 
 
 

@@ -3,12 +3,15 @@ import json
 import os
 import requests
 import time
-#from wrapt_timeout_decorator import *
+import sys
 
 '''
 Defines routing methods including GET, PUT, DELETE, and a general FORWARD
 Defines causal objects and provides parsing methods
 '''
+
+max_wait = 5
+
 class Router():
 	def __init__(self):
 		self.methods = ['GET', 'POST', 'DELETE']
@@ -19,22 +22,21 @@ class Router():
 	def base(self, address, path):
 		ip_port = address.split(':')
 		endpoint = 'http://' + ip_port[0] + ':' + ip_port[1] + path
+		print(endpoint, file=sys.stderr)
 		headers = {'content-type': 'application/json'}
 		return endpoint, headers
 
 	# -------------------------------------------------------------------------
-	#@timeout(5, use_signals=False)
 	def GET(self, address, path, data):
 		
 		endpoint, header = self.base(address, path)
 
-		r = requests.get(endpoint, json=data, headers=header)
+		r = requests.get(endpoint, json=data, headers=header, timeout=max_wait)
 
-		return r.get_json(), r.status_code
+		return r
 
 
 	# -------------------------------------------------------------------------
-	#@timeout(5, use_signals=False)
 	def PUT(self, address, path, data):
 		
 		endpoint, header = self.base(address, path)
@@ -42,33 +44,26 @@ class Router():
 		if data == None:
 			data = request.get_json() 
 
-		r = requests.put(endpoint, json=data, headers=header)
-		return r.get_json(), r.status_code
+		r = requests.put(endpoint, json=data, headers=header, timeout=max_wait)
+		return r
 
 	# -------------------------------------------------------------------------
-	#@timeout(5, use_signals=False)
 	def DELETE(self, address, path, data):
 		
 		endpoint, header = self.base(address, path)
 
-		r = requests.delete(endpoint, json=data, headers=header)
-		
-		if forward:
-			return make_response(r.content, r.status_code)
-		return r.get_json(), r.status_code
+		r = requests.delete(endpoint, json=data, headers=header, timeout=max_wait)
+
+		return r
 
 	# -------------------------------------------------------------------------
 	def FORWARD(self, address, method, path, data):
 		if method == "GET":
-			self.GET(address,path,data)
+			return self.GET(address,path,data)
 		if method == "PUT":
-			self.PUT(address,path,data)
+			return self.PUT(address,path,data)
 		if method == "DELETE":
-			self.DELETE(address,path,data)
-
-
-
-
+			return self.DELETE(address,path,data)
 
 
 

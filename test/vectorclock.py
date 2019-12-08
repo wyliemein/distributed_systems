@@ -7,8 +7,8 @@ class VectorClock():
     def __init__(self, view=None, clock=None):
         if view is not None:
             self.vectorclock = {}
-            for key in view.items():
-                self.vectorclock[key] = 0
+            for node in view:
+                self.vectorclock[node] = 0
         elif clock is not None:
             self.vectorclock = clock
 

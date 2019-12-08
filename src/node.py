@@ -14,8 +14,6 @@ from apscheduler.scheduler import Scheduler
 import random
 import sys
 
-
-
 class Node(KV_store):
 	'''docstring for node class'''
 	def __init__(self, router, address, view, replication_factor):
@@ -37,6 +35,7 @@ class Node(KV_store):
 		self.V_SHARDS = [] # store all virtual shards
 		self.P_SHARDS = [[] for i in range(0, self.num_shards)] # map physical shards to nodes
 		self.virtual_translation = {} # map virtual shards to physical shards
+		self.backoff_mod = 113
    
 		self.router = router
 		self.view_change(view, replication_factor)
@@ -69,6 +68,9 @@ class Node(KV_store):
 	'''
 	def all_shards(self):
 		return self.P_SHARDS
+
+	def all_nodes(self):
+		return self.nodes
 
 	'''
 	get all nodes in this shard
@@ -167,6 +169,7 @@ class Node(KV_store):
 
 			if node == self.ADDRESS:
 				self.shard_ID = buckets[node]
+
 				self.sched.add_interval_job(self.gossip, seconds=self.gossip_backoff())
 
 			# add a new node
@@ -288,20 +291,6 @@ class Node(KV_store):
 		self.P_SHARDS.pop(shard_ID)
 
 	'''
-	transfer keys from one shard to another
-	send keys from origin shard replicas to new shard replicas
-	'''
-	def keys_transfer(self):
-		for v in self.v_shards:
-
-			successor = self.find_shard('successor', v)
-			predecessor = self.find_shard('predecessor', v)
-
-			# if this node is the precessor a new v_shard, transfer keys over
-			if self.virtual_translation[predecessor] == self.shard_ID:
-				pass
-
-	'''
 	get all keys for a given shard
 	'''
 	def shard_keys(self):
@@ -312,7 +301,30 @@ class Node(KV_store):
 	concurrent operation: get new keys, send old keys, delete old keys
 	'''
 	def atomic_key_transfer(self, old_shard_ID, new_shard_ID, node):
-		return True
+		# message all nodes and tell them your state
+		# get new keys from new replica
+		self.final_state_transfer()
+
+		old_kv = self.KV_store
+		for replica in self.P_SHARDS[old_shard_ID]:
+			data = None
+
+			try:
+				res, status_code = self.router.GET(replica, '/kv-store/internal/KV', data, False)
+			except:
+				continue
+
+			if status_code == 201:
+				new_kv = res.get('KV_store')
+				update = False
+				for key in new_kv:
+					self.KV_store.keystore[key] = new_kv[key]
+				for key in old_kv:
+					del self.KV_store.keystore[key]
+
+				return True
+			
+		return False
 
 	'''
 	send final state of node before removing a node
@@ -325,7 +337,10 @@ class Node(KV_store):
 		replica_ip_addresses = self.shard_replicas(self.shard_ID)
 		for replica in replica_ip_addresses:
 			if (replica != self.ADDRESS):
-				res, status_code = self.router.PUT(replica, '/kv-store/internal/state-transfer', data, False)
+				try:
+					res, status_code = self.router.PUT(replica, '/kv-store/internal/state-transfer', data, False)
+				except:
+					continue
 				if status_code == 201:
 					return True
 		return False
@@ -356,8 +371,11 @@ class Node(KV_store):
 				"kv-store": current_key_store,
 				"tiebreaker": tiebreaker
 			}
-			response = self.router.PUT(replica,'/kv-store/internal/gossip/',json.dumps(data))
-			print("response: " + str(response.json()))
+			print("sending to node: " + replica + " " + str(data),file=sys.stderr)
+			try:
+				response = self.router.PUT(replica,'/kv-store/internal/gossip/',json.dumps(data))
+			except:
+				code = -1
 			code = response.status_code
 			if code == 200:
 				print("Took mine")
