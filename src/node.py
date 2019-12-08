@@ -167,7 +167,7 @@ class Node(KV_store):
 
 			if node == self.ADDRESS:
 				self.shard_ID = buckets[node]
-				self.sched.add_interval_job(gossip, seconds=self.gossip_backoff())
+				#self.sched.add_interval_job(self.gossip, seconds=self.gossip_backoff())
 
 			# add a new node
 			if node not in self.nodes:

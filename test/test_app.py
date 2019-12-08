@@ -16,10 +16,10 @@ class Test_API_endpoints(unittest.TestCase):
 
 	# simple system tests
 	# -------------------------------------------------------------------------
-	'''
+	
 	def test_get_key_count(self):
 		port = addr1.split(':')[1]
-		endpoint = 'http://127.0.0.1:13802/kv-store/key-count'
+		endpoint = 'http://127.0.0.1:13804/kv-store/key-count'
 		headers = {'content-type': 'application/json'}
 		payload = '{"causal-context": {}}'
 
@@ -27,7 +27,9 @@ class Test_API_endpoints(unittest.TestCase):
 		if res.ok:
 			json_res = res.json()
 			print('<key count is', json_res['key_count'], '>')
-	'''
+		else:
+			print(res)
+	
 	
 	def test_get_ID_and_key_count(self):
 		pass
@@ -40,9 +42,9 @@ class Test_API_endpoints(unittest.TestCase):
 
 	# key operations
 	# -------------------------------------------------------------------------
-	def test_insert_new_key(self):
+	'''def test_insert_new_key(self):
 		port = addr1.split(':')[1]
-		endpoint = 'http://127.0.0.1:13802/kv-store/keys/sampleKey'
+		endpoint = 'http://127.0.0.1:13802//kv-store/keys/sampleKey'
 		headers = {'content-type': 'application/json'}
 		payload = json.dumps({"value": "sampleValue", "causal-context": {}})
 
@@ -51,9 +53,10 @@ class Test_API_endpoints(unittest.TestCase):
 			json_res = res.json()
 			print(json_res)
 		else:
-			return False
+			print(res.content)
+			return False'''
 
-	def test_update_existing_key(self):
+	'''def test_update_existing_key(self):
 		port = addr1.split(':')[1]
 		endpoint = 'http://127.0.0.1:13802/kv-store/keys/sampleKey'
 		headers = {'content-type': 'application/json'}
@@ -69,7 +72,7 @@ class Test_API_endpoints(unittest.TestCase):
 				return False
 
 		else:
-			return False
+			return False'''
 
 	def test_read_existing_key(self):
 		pass
@@ -79,6 +82,24 @@ class Test_API_endpoints(unittest.TestCase):
 
 	# more advanded tests
 	# -------------------------------------------------------------------------
+	'''def test_view_change(self):
+		view = [addr1, addr2, addr3, addr4, addr5]
+		endpoint = 'http://127.0.0.1:13802/kv-store/view-change'
+		headers = {'content-type': 'application/json'}
+		payload = json.dumps({'view': view, 'repl_factor': 2, 'causal-context': {}})
+
+		print(endpoint)
+		print(payload)
+
+
+		res = requests.put(endpoint, data=None, headers=headers)
+		if res.ok:
+			json_res = res.json()
+			print(json_res)
+		else:
+			print(res)
+			return False'''
+
 	def test_single_node_failure(self):
 		pass
 

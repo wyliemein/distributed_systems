@@ -3,7 +3,6 @@ import json
 import os
 import requests
 import time
-import timeout_decorator
 
 '''
 Defines routing methods including GET, PUT, DELETE, and a general FORWARD
@@ -26,18 +25,16 @@ class Router():
 		return endpoint, headers
 
 	# -------------------------------------------------------------------------
-	@timeout_decorator.timeout(max_wait, use_signals=False)
 	def GET(self, address, path, data):
 		
 		endpoint, header = self.base(address, path)
 
-		r = requests.get(endpoint, json=data, headers=header)
+		r = requests.get(endpoint, json=data, headers=header, timeout=max_wait)
 
 		return r.get_json(), r.status_code
 
 
 	# -------------------------------------------------------------------------
-	@timeout_decorator.timeout(max_wait, use_signals=False)
 	def PUT(self, address, path, data):
 		
 		endpoint, header = self.base(address, path)
@@ -45,16 +42,15 @@ class Router():
 		if data == None:
 			data = request.get_json() 
 
-		r = requests.put(endpoint, json=data, headers=header)
+		r = requests.put(endpoint, json=data, headers=header, timeout=max_wait)
 		return r.get_json(), r.status_code
 
 	# -------------------------------------------------------------------------
-	@timeout_decorator.timeout(max_wait, use_signals=False)
 	def DELETE(self, address, path, data):
 		
 		endpoint, header = self.base(address, path)
 
-		r = requests.delete(endpoint, json=data, headers=header)
+		r = requests.delete(endpoint, json=data, headers=header, timeout=max_wait)
 
 		return r.get_json(), r.status_code
 

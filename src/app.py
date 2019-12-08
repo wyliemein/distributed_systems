@@ -3,7 +3,7 @@ app.py defines the network nodes that listen to requests from
 clients and other nodes int the system.
 '''
 
-from flask import Flask, request, jsonify, make_response, g
+from flask import Flask, request, jsonify, make_response
 import json
 import os
 import requests
@@ -140,13 +140,19 @@ def get_shard():
 Change our current view and re-shard keys
 Before we re-shard, make sure new node is up 
 '''
-@app.route('/kv-store/view-change', methods=['PUT'])
+@app.route("/kv-store/view-change", methods=['PUT', 'GET'])
 def new_view():
 
-	path = '/kv-store/internal/view-change'
+	#print('endpoint hit', file=sys.stderr)
+	return jsonify({
+		'test': 'test1'
+		}), 200
+
+	'''path = '/kv-store/internal/view-change'
 	method = 'PUT'
 	data = request.get_json()
-	view = data.get('view')
+
+	print('data:', data, file=sys.stderr)
 
 	keys = {}
 	all_nodes = shard.all_nodes()
@@ -154,13 +160,15 @@ def new_view():
 		if node == shard.ADDRESS:
 			continue
 
-		res = router.PUT(node, method, path, view)
+		res = router.PUT(node, method, path, data)
 
 		Response = json.loads(res.decode('utf-8'))
 		keys = Response['keys']
 		keys[node] = keys
 
-	shard.view_change(view)
+	view = data.get('view')
+	repl_factor = data.get('repl-factor')
+	shard.view_change(view, repl_factor)
 	keys[shard.ADDRESS] = shard.KV_Store.numberOfKeys()
 	
 	response = {}
@@ -172,7 +180,7 @@ def new_view():
 		response['view-change']['shards']['replicas'] = shard.P_SHARDS[shard]
 
 	json_res = json.dumps(response)
-	return json_res, 200
+	return json_res, 200'''
 
 
 '''
@@ -293,7 +301,10 @@ internal endpoint for viewchange
 @app.route('/kv-store/internal/view-change', methods=['PUT'])
 def spread_view():
 
-	view = (request.get_data().decode('utf8')).split(',')
+	data = request.get_json()
+	#view = (request.get_data().decode('utf8')).split(',')
+	view = data.get('view')
+	repl_factor = data.get('repl_factor')
 	shard.view_change(view)
 
 	return jsonify({
@@ -316,10 +327,7 @@ def state_transfer():
 '''
 internal endpoint to gossip/send state to all other replicas
 '''
-@app.route('/kv-store/internal/gossip', methods=['PUT'])
-def shard_gossip():
-
-@app.route('/kv-store/internal/gossisp/', methods=["PUT"])
+'''@app.route('/kv-store/internal/gossisp/', methods=["PUT"])
 def gossip():
 	data = request.get_json()
 	# checks if I am currently gossiping with someone else
@@ -352,7 +360,7 @@ def gossip():
 			}, 200
 		return {
 			"message"	: "I am gossiping with someone else",
-		}, 400
+		}, 400'''
 
 '''
 perfrom operation on node's local key-store
