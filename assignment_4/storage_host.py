@@ -65,7 +65,7 @@ class KV_store():
             self.keystore[key] = value
             response["replaced"] = False
             response["message"] = "Added successfully"
-            code = 200
+            code = 201
         return json.dumps(response), code
 
     def removeKey(self, key, context, address=None):
